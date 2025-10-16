@@ -17,6 +17,7 @@ export default function Analytics() {
           </div>
         ))}
       </div>
+      <p className="text-gray-400 text-sm mt-10">Версия сайта: 1.0.1 (локальное обновление)</p>
     </div>
   );
 }
