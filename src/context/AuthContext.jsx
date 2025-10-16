@@ -1,3 +1,4 @@
+// encoding: utf-8
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -10,7 +11,7 @@ export function AuthProvider({ children }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // при изменении user — сохраняем в localStorage
+  // Синхронизируем состояние авторизации с localStorage.
   useEffect(() => {
     if (user) {
       localStorage.setItem("auth", JSON.stringify(user));
@@ -19,7 +20,7 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
-  // вход
+  // Проверяем логин и пароль администратора.
   const login = (login, password) => {
     if (login === "admin" && password === "admin") {
       const data = { username: "admin", role: "admin" };
@@ -30,7 +31,7 @@ export function AuthProvider({ children }) {
     return false;
   };
 
-  // выход
+  // Очищаем авторизацию и возвращаем на страницу входа.
   const logout = () => {
     setUser(null);
     navigate("/login", { replace: true });

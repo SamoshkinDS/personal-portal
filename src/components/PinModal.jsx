@@ -1,62 +1,86 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+// encoding: utf-8
+import React, { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+
+const PIN_CODE = "1234";
 
 export default function PinModal({ onSuccess }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
+  const inputRef = useRef(null);
 
-  const checkPin = () => {
-    if (pin === "1234") {
+  // Фокусируем поле сразу после появления модального окна.
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleChange = (event) => {
+    const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 4);
+    setPin(digitsOnly);
+    if (error) setError("");
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (pin === PIN_CODE) {
+      setPin("");
+      setError("");
       onSuccess();
     } else {
-      setError("Неверный PIN-код");
+      setError("Неверный PIN-код. Попробуйте снова.");
     }
   };
 
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-md"
+        className="pin-modal fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.25 }}
       >
-        <motion.div
-          className="bg-white rounded-2xl p-6 shadow-2xl w-80 border border-gray-200"
-          initial={{ scale: 0.8, opacity: 0, y: 30 }}
+        <motion.form
+          onSubmit={handleSubmit}
+          className="pin-modal__card w-full max-w-xs space-y-4 rounded-2xl bg-white p-6 shadow-2xl"
+          initial={{ scale: 0.9, opacity: 0, y: 24 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.8, opacity: 0, y: 20 }}
-          transition={{
-            type: "spring",
-            stiffness: 180,
-            damping: 15,
-            duration: 0.4,
-          }}
+          exit={{ scale: 0.9, opacity: 0, y: 16 }}
+          transition={{ type: "spring", stiffness: 200, damping: 18 }}
         >
-          <h3 className="text-lg font-semibold mb-4 text-center text-gray-800">
-            Введите PIN-код
-          </h3>
+          <div className="pin-modal__header text-center">
+            <h3 className="pin-modal__title text-lg font-semibold text-gray-900">
+              Введите PIN
+            </h3>
+            <p className="pin-modal__subtitle mt-1 text-sm text-gray-500">
+              Доступ к админ-панели защищён коротким кодом.
+            </p>
+          </div>
 
-          <input
+          <motion.input
+            ref={inputRef}
             type="password"
             value={pin}
-            onChange={(e) => setPin(e.target.value)}
+            onChange={handleChange}
+            inputMode="numeric"
+            autoComplete="one-time-code"
             placeholder="••••"
-            className="border w-full mb-3 p-2 rounded text-center tracking-widest text-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="pin-modal__input w-full rounded-xl border border-gray-200 p-3 text-center text-2xl tracking-[0.5rem] text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            whileFocus={{ scale: 1.01 }}
           />
 
-          {error && (
-            <p className="text-red-500 text-sm text-center mb-2">{error}</p>
-          )}
+          <div className="pin-modal__error min-h-[20px] text-center text-sm text-red-500">
+            {error}
+          </div>
 
-          <button
-            onClick={checkPin}
-            className="bg-blue-600 text-white w-full mt-3 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
+          <motion.button
+            type="submit"
+            className="pin-modal__submit w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-500/30 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            whileTap={{ scale: 0.97 }}
           >
-            Подтвердить
-          </button>
-        </motion.div>
+            Войти
+          </motion.button>
+        </motion.form>
       </motion.div>
     </AnimatePresence>
   );

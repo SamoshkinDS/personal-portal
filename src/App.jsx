@@ -1,5 +1,11 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 
@@ -11,14 +17,17 @@ import Posts from "./pages/Posts.jsx";
 import Settings from "./pages/Settings.jsx";
 import Login from "./pages/Login.jsx";
 import Admin from "./pages/Admin.jsx";
+import Outline from "./pages/vpn/Outline.jsx";
+import VLESS from "./pages/vpn/VLESS.jsx";
 
-function Page({ children }) {
+function RouteTransition({ children }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      className="app-route flex-1 overflow-y-auto"
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.25 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
     >
       {children}
     </motion.div>
@@ -33,21 +42,87 @@ function AppRoutes() {
     <AnimatePresence mode="wait">
       {!isAuth ? (
         <Routes location={location} key={location.pathname}>
-          <Route path="/login" element={<Page><Login /></Page>} />
+          <Route
+            path="/login"
+            element={
+              <RouteTransition>
+                <Login />
+              </RouteTransition>
+            }
+          />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       ) : (
-        <div className="flex">
+        <div className="app-layout flex min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-200 text-gray-900 transition-colors duration-500 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-gray-100">
           <Sidebar />
-          <div className="flex-1 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-300">
+          <div className="app-layout__content flex min-w-0 flex-1 flex-col transition-colors duration-500">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<Navigate to="/analytics" replace />} />
-              <Route path="/analytics" element={<Page><Analytics /></Page>} />
-              <Route path="/ai" element={<Page><AI /></Page>} />
-              <Route path="/docs" element={<Page><Docs /></Page>} />
-              <Route path="/posts" element={<Page><Posts /></Page>} />
-              <Route path="/settings" element={<Page><Settings /></Page>} />
-              <Route path="/admin" element={<Page><Admin /></Page>} />
+              <Route
+                path="/analytics"
+                element={
+                  <RouteTransition>
+                    <Analytics />
+                  </RouteTransition>
+                }
+              />
+              <Route
+                path="/ai"
+                element={
+                  <RouteTransition>
+                    <AI />
+                  </RouteTransition>
+                }
+              />
+              <Route
+                path="/docs"
+                element={
+                  <RouteTransition>
+                    <Docs />
+                  </RouteTransition>
+                }
+              />
+              <Route
+                path="/posts"
+                element={
+                  <RouteTransition>
+                    <Posts />
+                  </RouteTransition>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <RouteTransition>
+                    <Settings />
+                  </RouteTransition>
+                }
+              />
+              <Route path="/vpn" element={<Navigate to="/vpn/outline" replace />} />
+              <Route
+                path="/vpn/outline"
+                element={
+                  <RouteTransition>
+                    <Outline />
+                  </RouteTransition>
+                }
+              />
+              <Route
+                path="/vpn/vless"
+                element={
+                  <RouteTransition>
+                    <VLESS />
+                  </RouteTransition>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <RouteTransition>
+                    <Admin />
+                  </RouteTransition>
+                }
+              />
               <Route path="*" element={<Navigate to="/analytics" replace />} />
             </Routes>
           </div>
