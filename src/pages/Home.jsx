@@ -8,7 +8,7 @@ const quickLinks = [
   { to: "/analytics", label: "Аналитика", color: "from-sky-400 to-blue-600" },
   { to: "/ai", label: "Нейронки", color: "from-violet-400 to-indigo-600" },
   { to: "/docs", label: "Документация", color: "from-emerald-400 to-teal-600" },
-  { to: "/vpn/outline", label: "VPN", color: "from-amber-400 to-orange-600" },
+  { to: "/vpn", label: "VPN", color: "from-amber-400 to-orange-600" },
 ];
 
 const LS_TODO_KEY = "portal_todos";
@@ -85,7 +85,7 @@ export default function Home() {
             >
               <div className="rounded-3xl bg-white/90 p-5 text-gray-900 transition-colors duration-500 dark:bg-slate-900/80 dark:text-gray-100">
                 <div className="text-lg font-semibold">{item.label}</div>
-                <div className="mt-1 text-xs text-white/80">Быстрый переход</div>
+                <div className="mt-1 text-xs text-slate-500 dark:text-white/80">Быстрый переход</div>
               </div>
             </Link>
           </motion.div>
@@ -160,4 +160,3 @@ export default function Home() {
     </PageShell>
   );
 }
-

@@ -5,3 +5,27 @@
 body {
   font-family: system-ui, sans-serif;
 }
+
+/* Sidebar stability tweaks */
+.sidebar { @apply bg-white dark:bg-slate-950; }
+
+.sidebar__nav {
+  /* не прыгает при появлении скроллбара */
+  scrollbar-gutter: stable;
+}
+
+.sidebar__link {
+  /* читаемость по умолчанию в тёмной теме */
+  @apply text-slate-700 dark:text-gray-200;
+}
+
+.sidebar__link[aria-current="page"],
+.sidebar__sublink[aria-current="page"] {
+  /* активные элементы — одинаково заметны в светлой/тёмной теме */
+  @apply bg-gradient-to-r from-blue-500/15 to-indigo-600/15 ring-1 ring-blue-500/20 text-slate-900 dark:from-indigo-500/20 dark:to-blue-600/20 dark:text-white dark:ring-white/10;
+}
+
+.sidebar__link-icon {
+  /* единый контейнер иконок: размер/фон/кольцо */
+  @apply h-10 w-10 shrink-0 rounded-xl bg-white/60 ring-1 ring-black/5 dark:bg-white/10 dark:ring-white/10 flex items-center justify-center;
+}

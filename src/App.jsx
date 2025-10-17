@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -20,6 +20,7 @@ import Admin from "./pages/Admin.jsx";
 import Home from "./pages/Home.jsx";
 import Outline from "./pages/vpn/Outline.jsx";
 import VLESS from "./pages/vpn/VLESS.jsx";
+import VPNIndex from "./pages/vpn/Index.jsx";
 
 function RouteTransition({ children }) {
   return (
@@ -40,7 +41,7 @@ function AppRoutes() {
   const { isAuth } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  // Глобальный переключатель для PageShell/Header
+  // Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ РїРµСЂРµРєР»СЋС‡Р°С‚РµР»СЊ РґР»СЏ PageShell/Header
   React.useEffect(() => {
     window.__toggleSidebar = () => setMobileOpen((v) => !v);
     return () => {
@@ -48,7 +49,12 @@ function AppRoutes() {
     };
   }, []);
 
-  // Свайпы: открыть от левого края вправо, закрыть — влево
+  // Р—Р°РєСЂС‹РІР°РµРј РјРѕР±РёР»СЊРЅРѕРµ РјРµРЅСЋ РїСЂРё РЅР°РІРёРіР°С†РёРё РЅР° РЅРѕРІСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ
+  React.useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // РЎРІР°Р№РїС‹: РѕС‚РєСЂС‹С‚СЊ РѕС‚ Р»РµРІРѕРіРѕ РєСЂР°СЏ РІРїСЂР°РІРѕ, Р·Р°РєСЂС‹С‚СЊ вЂ” РІР»РµРІРѕ
   const touchRef = React.useRef({ startX: 0, startY: 0, tracking: false });
   const onTouchStart = (e) => {
     const t = e.touches?.[0];
@@ -60,7 +66,7 @@ function AppRoutes() {
     if (!t || !touchRef.current.tracking) return;
     const dx = t.clientX - touchRef.current.startX;
     const dy = t.clientY - touchRef.current.startY;
-    if (Math.abs(dy) > Math.abs(dx)) return; // вертикаль — игнор
+    if (Math.abs(dy) > Math.abs(dx)) return; // РІРµСЂС‚РёРєР°Р»СЊ вЂ” РёРіРЅРѕСЂ
     if (!mobileOpen && touchRef.current.startX < 24 && dx > 60) {
       setMobileOpen(true);
       touchRef.current.tracking = false;
@@ -89,8 +95,18 @@ function AppRoutes() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       ) : (
-        <div className="app-layout flex min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-200 text-gray-900 transition-colors duration-500 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-gray-100">
+        <div className="app-layout flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 text-gray-900 transition-colors duration-500 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 dark:text-gray-100">
           <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
+          {/* Р—РѕРЅР° Р·Р°С…РІР°С‚Р° СЃРІР°Р№РїР° РѕС‚ Р»РµРІРѕРіРѕ РєСЂР°СЏ РґР»СЏ iOS PWA Рё РјРѕР±РёР»СЊРЅС‹С… Р±СЂР°СѓР·РµСЂРѕРІ */}
+          {!mobileOpen && (
+            <div
+              className="fixed inset-y-0 left-0 z-20 w-6 sm:hidden"
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+              aria-hidden="true"
+            />
+          )}
           <div
             className="app-layout__content flex min-w-0 flex-1 flex-col transition-colors duration-500"
             onTouchStart={onTouchStart}
@@ -146,7 +162,14 @@ function AppRoutes() {
                   </RouteTransition>
                 }
               />
-              <Route path="/vpn" element={<Navigate to="/vpn/outline" replace />} />
+              <Route
+                path="/vpn"
+                element={
+                  <RouteTransition>
+                    <VPNIndex />
+                  </RouteTransition>
+                }
+              />
               <Route
                 path="/vpn/outline"
                 element={
@@ -189,3 +212,4 @@ export default function App() {
     </Router>
   );
 }
+

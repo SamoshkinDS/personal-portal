@@ -1,7 +1,11 @@
 // encoding: utf-8
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import toast, { Toaster } from "react-hot-toast";
+import ServerStatCard from "../components/ServerStatCard.jsx";
+import SystemCharts from "../components/SystemCharts.jsx";
+import { getServerStats } from "../utils/systemInfo.js";
 import PageShell from "../components/PageShell.jsx";
 import PinModal from "../components/PinModal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -253,7 +257,27 @@ export default function Admin() {
       onLogout={handleLogoutClick}
       contentClassName="admin admin--dashboard flex flex-col gap-6 bg-transparent p-0"
     >
+      <Toaster position="top-right" />
       <div className="admin__grid grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <motion.section
+          className="xl:col-span-3 rounded-3xl bg-white/90 p-6 shadow-lg shadow-slate-200/70 backdrop-blur transition-colors duration-500 dark:bg-slate-900/80 dark:shadow-black/30"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <h2 className="text-lg font-semibold">Сводная панель</h2>
+          <ServerOverview />
+        </motion.section>
+
+        <motion.section
+          className="xl:col-span-3 rounded-3xl bg-white/90 p-6 shadow-lg shadow-slate-200/70 backdrop-blur transition-colors duration-500 dark:bg-slate-900/80 dark:shadow-black/30"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <h2 className="text-lg font-semibold">Графики</h2>
+          <SystemCharts collapsibleOnMobile />
+        </motion.section>
         <motion.section
           className="admin__system rounded-3xl bg-white/90 p-6 shadow-lg shadow-slate-200/70 backdrop-blur transition-colors duration-500 dark:bg-slate-900/80 dark:shadow-black/30"
           initial={{ opacity: 0, y: 12 }}
@@ -473,5 +497,92 @@ export default function Admin() {
         </motion.section>
       </div>
     </PageShell>
+  );
+}
+
+function ServerOverview() {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState({ cpu: 0, disk: 0, bandwidth: { in: 0, out: 0 }, uptime: "" });
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const res = await getServerStats();
+      setData(res);
+      toast.success("Данные обновлены");
+    } catch (e) {
+      toast.error("Ошибка загрузки данных");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const cards = useMemo(
+    () => [
+      {
+        title: "Использование CPU",
+        value: `${data.cpu?.toFixed?.(1) ?? 0}`,
+        unit: "%",
+        percent: data.cpu ?? 0,
+        color: "#f59e0b",
+        subtitle: "Средняя загрузка процессора",
+      },
+      {
+        title: "Использование диска",
+        value: `${data.disk?.toFixed?.(1) ?? 0}`,
+        unit: "%",
+        percent: data.disk ?? 0,
+        color: "#10b981",
+        subtitle: "Средняя загрузка хранилища",
+      },
+      {
+        title: "Пропускная способность (in/out)",
+        value: `${Math.round(data.bandwidth?.in ?? 0)} / ${Math.round(data.bandwidth?.out ?? 0)}`,
+        unit: "MB",
+        percent: null,
+        color: "#3b82f6",
+        subtitle: "Трафик за 24 часа",
+      },
+      {
+        title: "Аптайм",
+        value: data.uptime || "—",
+        unit: "",
+        percent: null,
+        color: "#8b5cf6",
+        subtitle: "Время бесперебойной работы",
+      },
+    ],
+    [data]
+  );
+
+  return (
+    <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <AnimatePresence>
+        {cards.map((c) => (
+          <ServerStatCard
+            key={c.title}
+            title={c.title}
+            value={c.value}
+            unit={c.unit}
+            percent={c.percent}
+            color={c.color}
+            subtitle={c.subtitle}
+          />
+        ))}
+      </AnimatePresence>
+      {loading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="col-span-full text-sm text-gray-500 dark:text-gray-400"
+        >
+          Загрузка данных…
+        </motion.div>
+      )}
+    </div>
   );
 }
