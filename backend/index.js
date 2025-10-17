@@ -76,6 +76,11 @@ app.get("/", (req, res) => {
   res.send("✅ Backend is running!");
 });
 
+// Test /api
+app.get("/api", (req, res) => {
+  res.json({ message: "Backend is alive 🚀" });
+});
+
 // Simple system stats endpoint
 app.get("/api/system-stats", (req, res) => {
   try {

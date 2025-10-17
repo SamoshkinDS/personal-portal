@@ -7,7 +7,7 @@
   "dev": "vite",
   "build": "vite build",
   "preview": "vite preview",
-  "deploy": "git pull origin main && npm run fix-perms && npm install && npm run build && sudo systemctl reload nginx",
+   "deploy": "git pull origin main && npm install && npm run build && cd backend && npm install && sudo systemctl restart personal-portal-backend && cd .. && sudo systemctl reload nginx",
   "fix-perms": "sudo chown -R botuser:botuser /var/www/personal-portal && sudo chmod -R 755 /var/www/personal-portal"
 },
   "dependencies": {
