@@ -17,6 +17,7 @@ import Posts from "./pages/Posts.jsx";
 import Settings from "./pages/Settings.jsx";
 import Login from "./pages/Login.jsx";
 import Admin from "./pages/Admin.jsx";
+import Home from "./pages/Home.jsx";
 import Outline from "./pages/vpn/Outline.jsx";
 import VLESS from "./pages/vpn/VLESS.jsx";
 
@@ -37,6 +38,41 @@ function RouteTransition({ children }) {
 function AppRoutes() {
   const location = useLocation();
   const { isAuth } = useAuth();
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  // Глобальный переключатель для PageShell/Header
+  React.useEffect(() => {
+    window.__toggleSidebar = () => setMobileOpen((v) => !v);
+    return () => {
+      delete window.__toggleSidebar;
+    };
+  }, []);
+
+  // Свайпы: открыть от левого края вправо, закрыть — влево
+  const touchRef = React.useRef({ startX: 0, startY: 0, tracking: false });
+  const onTouchStart = (e) => {
+    const t = e.touches?.[0];
+    if (!t) return;
+    touchRef.current = { startX: t.clientX, startY: t.clientY, tracking: true };
+  };
+  const onTouchMove = (e) => {
+    const t = e.touches?.[0];
+    if (!t || !touchRef.current.tracking) return;
+    const dx = t.clientX - touchRef.current.startX;
+    const dy = t.clientY - touchRef.current.startY;
+    if (Math.abs(dy) > Math.abs(dx)) return; // вертикаль — игнор
+    if (!mobileOpen && touchRef.current.startX < 24 && dx > 60) {
+      setMobileOpen(true);
+      touchRef.current.tracking = false;
+    }
+    if (mobileOpen && dx < -60) {
+      setMobileOpen(false);
+      touchRef.current.tracking = false;
+    }
+  };
+  const onTouchEnd = () => {
+    touchRef.current.tracking = false;
+  };
 
   return (
     <AnimatePresence mode="wait">
@@ -54,10 +90,22 @@ function AppRoutes() {
         </Routes>
       ) : (
         <div className="app-layout flex min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-200 text-gray-900 transition-colors duration-500 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-gray-100">
-          <Sidebar />
-          <div className="app-layout__content flex min-w-0 flex-1 flex-col transition-colors duration-500">
+          <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
+          <div
+            className="app-layout__content flex min-w-0 flex-1 flex-col transition-colors duration-500"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
             <Routes location={location} key={location.pathname}>
-              <Route path="/" element={<Navigate to="/analytics" replace />} />
+              <Route
+                path="/"
+                element={
+                  <RouteTransition>
+                    <Home />
+                  </RouteTransition>
+                }
+              />
               <Route
                 path="/analytics"
                 element={

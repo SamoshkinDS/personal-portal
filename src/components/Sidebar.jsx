@@ -158,7 +158,7 @@ const navItems = [
   }
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }) {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -318,6 +318,7 @@ export default function Sidebar() {
   };
 
   return (
+    <>
     <motion.aside
       className={`sidebar ${isCollapsed ? "sidebar--collapsed" : ""} sticky top-0 hidden h-screen bg-slate-900/95 text-gray-100 shadow-lg shadow-slate-900/25 transition-colors duration-500 dark:bg-slate-950/95 sm:flex sm:flex-col`}
       animate={{ width: isCollapsed ? 88 : 256 }}
@@ -356,5 +357,44 @@ export default function Sidebar() {
         <div className="flex flex-col gap-1">{navItems.map(renderNavLink)}</div>
       </nav>
     </motion.aside>
+    {/* Мобильный drawer */}
+    <AnimatePresence>
+      {mobileOpen && (
+        <motion.div
+          key="mobile-drawer"
+          className="fixed inset-0 z-40 sm:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onCloseMobile}
+        >
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <motion.aside
+            className="absolute left-0 top-0 h-full w-72 bg-slate-900 text-gray-100 shadow-2xl dark:bg-slate-950"
+            initial={{ x: -320 }}
+            animate={{ x: 0 }}
+            exit={{ x: -320 }}
+            transition={{ type: "spring", stiffness: 240, damping: 24 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+              <span className="text-base font-semibold">Меню</span>
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20"
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+            <nav className="max-h-[calc(100%-56px)] overflow-y-auto px-3 py-4">
+              <div className="flex flex-col gap-1">{navItems.map(renderNavLink)}</div>
+            </nav>
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
