@@ -1,7 +1,9 @@
 // encoding: utf-8
+import { apiFetch } from "./api.js";
+
 export async function getServerStats() {
   try {
-    const res = await fetch("http://localhost:4000/api/system-stats");
+    const res = await apiFetch("/api/system-stats");
     if (!res.ok) throw new Error("Server error");
     return await res.json();
   } catch {

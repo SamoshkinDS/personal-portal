@@ -3,6 +3,7 @@ import React from "react";
 import toast from "react-hot-toast";
 import PageShell from "../components/PageShell.jsx";
 import { useTheme } from "../hooks/useTheme.js";
+import { apiFetch } from "../utils/api.js";
 
 export default function Settings() {
   const { isDark, toggleTheme } = useTheme();
@@ -12,7 +13,7 @@ export default function Settings() {
   React.useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch("http://localhost:4000/api/user/profile", {
+        const res = await apiFetch("/api/user/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
@@ -25,7 +26,7 @@ export default function Settings() {
   const saveProfile = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:4000/api/user/profile", {
+      const res = await apiFetch("/api/user/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(profile),

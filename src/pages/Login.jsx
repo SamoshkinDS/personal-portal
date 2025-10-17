@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { apiFetch } from "../utils/api.js";
 
 export default function Login({ initialMode }) {
   const { login } = useAuth();
@@ -29,7 +30,7 @@ export default function Login({ initialMode }) {
   const submitRegister = async (e) => {
     e.preventDefault();
     setError("");
-    const res = await fetch("http://localhost:4000/api/auth/register", {
+    const res = await apiFetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(regForm),
@@ -55,8 +56,8 @@ export default function Login({ initialMode }) {
     e.preventDefault();
     setError("");
     if (!resetUsername) return setError("Введите имя пользователя");
-    const r = await fetch(
-      `http://localhost:4000/api/auth/exists?username=${encodeURIComponent(resetUsername)}`
+    const r = await apiFetch(
+      `/api/auth/exists?username=${encodeURIComponent(resetUsername)}`
     );
     const data = await r.json().catch(() => ({}));
     if (r.ok && data?.exists) {
@@ -68,7 +69,7 @@ export default function Login({ initialMode }) {
   const submitReset = async (e) => {
     e.preventDefault();
     setError("");
-    const r = await fetch("http://localhost:4000/api/auth/reset-password", {
+    const r = await apiFetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: resetUsername, newPassword: resetPassword }),

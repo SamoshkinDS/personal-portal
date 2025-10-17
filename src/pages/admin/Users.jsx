@@ -3,6 +3,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import PageShell from "../../components/PageShell.jsx";
 import toast from "react-hot-toast";
+import { apiFetch } from "../../utils/api.js";
 
 const ROLES = [
   { value: "ALL", label: "Доступ ко всему" },
@@ -21,7 +22,7 @@ export default function AdminUsers() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:4000/api/admin/users", {
+      const res = await apiFetch("/api/admin/users", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -38,7 +39,7 @@ export default function AdminUsers() {
   React.useEffect(() => { load(); }, []);
 
   const setBlocked = async (id, isBlocked) => {
-    const res = await fetch(`http://localhost:4000/api/admin/users/${id}/block`, {
+    const res = await apiFetch(`/api/admin/users/${id}/block`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ isBlocked }),
@@ -52,7 +53,7 @@ export default function AdminUsers() {
   };
 
   const setRole = async (id, role, vpnCanCreate) => {
-    const res = await fetch(`http://localhost:4000/api/admin/users/${id}/role`, {
+    const res = await apiFetch(`/api/admin/users/${id}/role`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ role, vpnCanCreate }),
@@ -139,4 +140,3 @@ export default function AdminUsers() {
     </PageShell>
   );
 }
-

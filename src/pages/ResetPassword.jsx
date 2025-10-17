@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { apiFetch } from "../utils/api.js";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -13,7 +14,7 @@ export default function ResetPassword() {
     e.preventDefault();
     setError("");
     try {
-      const res = await fetch("http://localhost:4000/api/auth/reset-password", {
+      const res = await apiFetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -75,4 +76,3 @@ export default function ResetPassword() {
     </div>
   );
 }
-

@@ -2,6 +2,7 @@
 import React from "react";
 import PageShell from "../../components/PageShell.jsx";
 import toast from "react-hot-toast";
+import { apiFetch } from "../../utils/api.js";
 
 export default function AdminLogs() {
   const [logs, setLogs] = React.useState([]);
@@ -12,7 +13,7 @@ export default function AdminLogs() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:4000/api/admin/logs', {
+      const res = await apiFetch('/api/admin/logs', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -32,7 +33,7 @@ export default function AdminLogs() {
     e.preventDefault();
     if (!text.trim()) return;
     try {
-      const res = await fetch('http://localhost:4000/api/admin/logs', {
+      const res = await apiFetch('/api/admin/logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message: text.trim() })
@@ -76,4 +77,3 @@ export default function AdminLogs() {
     </PageShell>
   );
 }
-

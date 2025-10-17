@@ -3,6 +3,7 @@ import React from "react";
 import PageShell from "../../components/PageShell.jsx";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import { apiFetch } from "../../utils/api.js";
 
 const TABS = [
   { key: 'articles', label: 'Статьи', api: 'article' },
@@ -21,7 +22,7 @@ export default function AdminContent() {
     try {
       setLoading(true);
       const cur = TABS.find(t => t.key === active);
-      const res = await fetch(`http://localhost:4000/api/admin/content?type=${cur.api}`, {
+      const res = await apiFetch(`/api/admin/content?type=${cur.api}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -41,7 +42,7 @@ export default function AdminContent() {
     e.preventDefault();
     try {
       const cur = TABS.find(t => t.key === active);
-      const res = await fetch('http://localhost:4000/api/admin/content', {
+      const res = await apiFetch('/api/admin/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ type: cur.api, ...form })
@@ -59,7 +60,7 @@ export default function AdminContent() {
 
   const remove = async (id) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/admin/content/${id}`, {
+      const res = await apiFetch(`/api/admin/content/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -134,4 +135,3 @@ export default function AdminContent() {
     </PageShell>
   );
 }
-
