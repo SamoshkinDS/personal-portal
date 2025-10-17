@@ -6,19 +6,35 @@ import { useTheme } from "../hooks/useTheme.js";
 
 export default function Settings() {
   const { isDark, toggleTheme } = useTheme();
-  const [profile, setProfile] = React.useState(() => {
-    try {
-      const raw = localStorage.getItem("user_profile");
-      return raw ? JSON.parse(raw) : { name: "", email: "", phone: "" };
-    } catch {
-      return { name: "", email: "", phone: "" };
-    }
-  });
+  const [profile, setProfile] = React.useState({ name: "", email: "", phone: "" });
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-  const saveProfile = (e) => {
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("http://localhost:4000/api/user/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (res.ok) setProfile({ name: data.profile?.name || "", email: data.profile?.email || "", phone: data.profile?.phone || "" });
+      } catch {}
+    };
+    if (token) load();
+  }, [token]);
+
+  const saveProfile = async (e) => {
     e.preventDefault();
-    localStorage.setItem("user_profile", JSON.stringify(profile));
-    toast.success("Настройки профиля сохранены");
+    try {
+      const res = await fetch("http://localhost:4000/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(profile),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Профиль сохранён");
+    } catch {
+      toast.error("Не удалось сохранить профиль");
+    }
   };
 
   return (

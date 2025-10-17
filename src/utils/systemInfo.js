@@ -1,7 +1,7 @@
 // encoding: utf-8
 export async function getServerStats() {
   try {
-    const res = await fetch("/api/system-stats");
+    const res = await fetch("http://localhost:4000/api/system-stats");
     if (!res.ok) throw new Error("Server error");
     return await res.json();
   } catch {
@@ -17,4 +17,3 @@ export async function getServerStats() {
     };
   }
 }
-

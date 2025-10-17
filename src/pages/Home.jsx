@@ -62,6 +62,8 @@ export default function Home() {
     }
   };
 
+  
+
   return (
     <PageShell title="Главная" contentClassName="home p-0 bg-transparent">
       <section className="rounded-3xl bg-white/80 p-6 shadow-sm transition-colors duration-500 dark:bg-slate-900/80">
@@ -157,6 +159,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      
     </PageShell>
   );
 }

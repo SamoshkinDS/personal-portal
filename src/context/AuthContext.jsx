@@ -1,6 +1,7 @@
 // encoding: utf-8
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const AuthContext = createContext();
 
@@ -11,7 +12,7 @@ export function AuthProvider({ children }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // Синхронизируем состояние авторизации с localStorage.
+  // Persist user in localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem("auth", JSON.stringify(user));
@@ -20,19 +21,46 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
-  // Проверяем логин и пароль администратора.
-  const login = (login, password) => {
-    if (login === "admin" && password === "admin") {
-      const data = { username: "admin", role: "admin" };
-      setUser(data);
-      navigate("/analytics", { replace: true });
+  // On mount, validate token and fetch user
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch("http://localhost:4000/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Invalid token");
+        const data = await r.json();
+        setUser(data.user);
+      })
+      .catch(() => {
+        localStorage.removeItem("token");
+        setUser(null);
+      });
+  }, []);
+
+  const login = async (username, password) => {
+    try {
+      const res = await fetch("http://localhost:4000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      localStorage.setItem("token", data.token);
+      setUser(data.user);
+      navigate("/", { replace: true });
       return true;
+    } catch (e) {
+      console.error(e);
+      toast.error("Ошибка входа");
+      return false;
     }
-    return false;
   };
 
-  // Очищаем авторизацию и возвращаем на страницу входа.
   const logout = () => {
+    localStorage.removeItem("token");
     setUser(null);
     navigate("/login", { replace: true });
   };
@@ -47,3 +75,4 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
