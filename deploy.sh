@@ -2,7 +2,7 @@
 set -e
 
 # ===============================
-# 🚀 Personal Portal — Deploy Script (extended .env safety)
+# 🚀 Personal Portal — Deploy Script (frontend env + backend env)
 # ===============================
 # Выполняется автоматически через:
 #   npm run deploy
@@ -10,38 +10,37 @@ set -e
 #   bash deploy.sh
 #
 # 🔧 Что делает:
-# 1. Сохраняет все .env файлы (в корне и backend)
+# 1. Сохраняет все .env файлы фронта и бэка
 # 2. Обновляет код из GitHub
 # 3. Восстанавливает .env файлы
-# 4. Устанавливает зависимости и собирает фронтенд (Vite)
-# 5. Перезапускает backend-сервис
-# 6. Перезагружает nginx и проверяет API
+# 4. Собирает фронт и перезапускает бэк
+# 5. Проверяет nginx и API
 # ===============================
 
 PROJECT_DIR="/var/www/personal-portal"
 BACKEND_DIR="$PROJECT_DIR/backend"
 BRANCH="main"
 SERVICE_NAME="personal-portal-backend"
+BACKUP_DIR="/tmp/personal-portal-env-backup"
 
-# --- Пути к .env файлам ---
-ENV_FILES=(
+mkdir -p "$BACKUP_DIR"
+
+# --- Пути к env-файлам ---
+ENV_FILES_FRONT=(
   "$PROJECT_DIR/.env"
   "$PROJECT_DIR/.env.production"
   "$PROJECT_DIR/.env.development"
-  "$BACKEND_DIR/.env"
-  "$BACKEND_DIR/.env.production"
-  "$BACKEND_DIR/.env.development"
 )
-
-BACKUP_DIR="/tmp/personal-portal-env-backup"
-mkdir -p "$BACKUP_DIR"
+ENV_FILES_BACK=(
+  "$BACKEND_DIR/.env"
+)
 
 echo "=== 🚀 Starting deploy at $(date) ==="
 cd "$PROJECT_DIR" || { echo "❌ ERROR: Project folder not found"; exit 1; }
 
 # --- 0️⃣ BACKUP ENV FILES ---
 echo "💾 Backing up environment files..."
-for FILE in "${ENV_FILES[@]}"; do
+for FILE in "${ENV_FILES_FRONT[@]}" "${ENV_FILES_BACK[@]}"; do
   if [ -f "$FILE" ]; then
     BASENAME=$(basename "$FILE")
     cp "$FILE" "$BACKUP_DIR/$BASENAME"
@@ -66,30 +65,29 @@ fi
 
 # --- 2️⃣ RESTORE ENV FILES ---
 echo "♻️ Restoring environment files..."
-for FILE in "${ENV_FILES[@]}"; do
+for FILE in "${ENV_FILES_FRONT[@]}" "${ENV_FILES_BACK[@]}"; do
   BASENAME=$(basename "$FILE")
+  TARGET_DIR=$(dirname "$FILE")
   if [ -f "$BACKUP_DIR/$BASENAME" ]; then
-    TARGET_DIR=$(dirname "$FILE")
     mv "$BACKUP_DIR/$BASENAME" "$TARGET_DIR/$BASENAME"
     echo "✅ Restored $BASENAME"
   fi
 done
 
-# --- 3️⃣ INSTALL FRONTEND DEPENDENCIES ---
+# --- 3️⃣ FRONTEND ---
 echo "🧩 Installing frontend dependencies..."
 if ! npm ci --no-audit --no-fund; then
   echo "⚠️ npm install failed! Попробуй очистить кэш: 'sudo rm -rf node_modules package-lock.json && npm install'"
   exit 1
 fi
 
-# --- 4️⃣ BUILD FRONTEND ---
 echo "🏗️ Building frontend..."
 if ! npm run build; then
   echo "❌ Frontend build failed! Проверь vite.config.js и ошибки выше."
   exit 1
 fi
 
-# --- 5️⃣ BACKEND DEPLOY ---
+# --- 4️⃣ BACKEND ---
 echo "🛠️ Updating backend..."
 cd "$BACKEND_DIR" || { echo "❌ Backend folder missing"; exit 1; }
 
@@ -106,7 +104,7 @@ else
   sudo systemctl start "$SERVICE_NAME"
 fi
 
-# --- 6️⃣ RELOAD NGINX ---
+# --- 5️⃣ NGINX ---
 echo "🌐 Reloading Nginx..."
 if ! sudo nginx -t; then
   echo "❌ Nginx config error! Проверь /etc/nginx/sites-available/personal-portal"
@@ -115,7 +113,7 @@ fi
 
 sudo systemctl reload nginx
 
-# --- 7️⃣ HEALTH CHECK ---
+# --- 6️⃣ HEALTH CHECK ---
 echo "🩺 Checking backend health..."
 sleep 2
 if curl -fs http://127.0.0.1:4000/api/ >/dev/null; then
