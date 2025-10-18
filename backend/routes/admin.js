@@ -1,16 +1,17 @@
 import express from "express";
-import { authRequired, requireRole } from "../middleware/auth.js";
+import { authRequired, requireRole, requirePermission } from "../middleware/auth.js";
 import { pool } from "../db/connect.js";
+import { sendPushToAll } from "../utils/push.js";
 
 const router = express.Router();
 
-// Admin-only routes (role: ALL)
-router.use(authRequired, requireRole(["ALL"]));
+// Admin-only routes via permission
+router.use(authRequired, requirePermission('admin_access'));
 
 router.get("/users", async (req, res) => {
   try {
     const q = await pool.query(`
-      SELECT u.id, u.username, u.created_at, u.role, u.is_blocked, u.vpn_can_create,
+      SELECT u.id, u.username, u.created_at, u.last_login, u.role, u.is_blocked, u.vpn_can_create,
              p.name, p.email, p.phone
       FROM users u
       LEFT JOIN user_profiles p ON p.user_id = u.id
@@ -136,8 +137,10 @@ router.post("/logs", async (req, res) => {
   try {
     const { message } = req.body || {};
     if (!message) return res.status(400).json({ message: "message is required" });
-    await pool.query("INSERT INTO admin_logs (message) VALUES ($1)", [String(message)]);
-    return res.status(201).json({ message: "Created" });
+    const s = await pool.query("INSERT INTO admin_logs (message) VALUES ($1) RETURNING id, created_at", [String(message)]);
+    // Fire-and-forget push notification (if VAPID configured)
+    sendPushToAll('Журнал событий', String(message), '/admin/logs').catch(() => {});
+    return res.status(201).json({ message: "Created", id: s.rows[0].id, created_at: s.rows[0].created_at });
   } catch (e) {
     console.error("POST /admin/logs", e);
     return res.status(500).json({ message: "Failed to create log" });
@@ -145,3 +148,48 @@ router.post("/logs", async (req, res) => {
 });
 
 export default router;
+// Permissions management
+router.get("/permissions", async (req, res) => {
+  try {
+    const q = await pool.query("SELECT key, description FROM permissions ORDER BY key");
+    return res.json({ permissions: q.rows });
+  } catch (e) {
+    console.error("GET /admin/permissions", e);
+    return res.status(500).json({ message: "Failed to list permissions" });
+  }
+});
+
+router.get("/users/:id/permissions", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id" });
+    const q = await pool.query("SELECT perm_key FROM user_permissions WHERE user_id = $1 ORDER BY perm_key", [id]);
+    return res.json({ permissions: q.rows.map(r => r.perm_key) });
+  } catch (e) {
+    console.error("GET /admin/users/:id/permissions", e);
+    return res.status(500).json({ message: "Failed to load permissions" });
+  }
+});
+
+router.put("/users/:id/permissions", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const id = Number(req.params.id);
+    const { permissions = [] } = req.body || {};
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id" });
+    await client.query('BEGIN');
+    await client.query("DELETE FROM user_permissions WHERE user_id = $1", [id]);
+    for (const key of permissions) {
+      if (typeof key !== 'string' || !key) continue;
+      await client.query("INSERT INTO user_permissions (user_id, perm_key) VALUES ($1, $2) ON CONFLICT DO NOTHING", [id, key]);
+    }
+    await client.query('COMMIT');
+    return res.json({ message: "Permissions updated" });
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch {}
+    console.error("PUT /admin/users/:id/permissions", e);
+    return res.status(500).json({ message: "Failed to update permissions" });
+  } finally {
+    client.release();
+  }
+});

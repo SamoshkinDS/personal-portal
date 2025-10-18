@@ -26,6 +26,9 @@ import Home from "./pages/Home.jsx";
 import Outline from "./pages/vpn/Outline.jsx";
 import VLESS from "./pages/vpn/VLESS.jsx";
 import VPNIndex from "./pages/vpn/Index.jsx";
+import OutlineGuide from "./pages/vpn/OutlineGuide.jsx";
+import { useEffect } from "react";
+import { registerPush } from "./push/registerPush.js";
 
 function RouteTransition({ children }) {
   return (
@@ -45,6 +48,11 @@ function AppRoutes() {
   const location = useLocation();
   const { isAuth, user } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  // Register SW + Push once
+  useEffect(() => {
+    registerPush();
+  }, []);
 
   // Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ РїРµСЂРµРєР»СЋС‡Р°С‚РµР»СЊ РґР»СЏ PageShell/Header
   React.useEffect(() => {
@@ -137,11 +145,11 @@ function AppRoutes() {
             <Routes location={location} key={location.pathname}>
               {(() => {
                 const role = user?.role || "NON_ADMIN";
-                const allowAll = role === "ALL";
-                const allowNonAdmin = role === "NON_ADMIN";
-                const allowAnalytics = allowAll || allowNonAdmin || role === "ANALYTICS";
-                const allowAI = allowAll || allowNonAdmin || role === "NEURAL";
-                const allowVPN = allowAll || allowNonAdmin || role === "VPN";
+                const perms = new Set(user?.permissions || []);
+                const can = (p) => role === 'ALL' || perms.has(p);
+                const allowAnalytics = can('view_analytics');
+                const allowAI = can('view_ai');
+                const allowVPN = can('view_vpn');
                 return (
                   <>
                     <Route
@@ -225,6 +233,18 @@ function AppRoutes() {
                       }
                     />
                     <Route
+                      path="/vpn/outline/guide"
+                      element={
+                        allowVPN ? (
+                          <RouteTransition>
+                            <OutlineGuide />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
                       path="/vpn/vless"
                       element={
                         allowVPN ? (
@@ -236,11 +256,11 @@ function AppRoutes() {
                         )
                       }
                     />
-                    <Route path="/admin" element={allowAll ? (<RouteTransition><AdminHome /></RouteTransition>) : (<NotFound />)} />
+                    <Route path="/admin" element={can('admin_access') ? (<RouteTransition><AdminHome /></RouteTransition>) : (<NotFound />)} />
                     <Route
                       path="/admin/users"
                       element={
-                        allowAll ? (
+                        can('admin_access') ? (
                           <RouteTransition>
                             <AdminUsers />
                           </RouteTransition>
@@ -249,8 +269,8 @@ function AppRoutes() {
                         )
                       }
                     />
-                    <Route path="/admin/content" element={allowAll ? (<RouteTransition><AdminContent /></RouteTransition>) : (<NotFound />)} />
-                    <Route path="/admin/logs" element={allowAll ? (<RouteTransition><AdminLogs /></RouteTransition>) : (<NotFound />)} />
+                    <Route path="/admin/content" element={can('admin_access') ? (<RouteTransition><AdminContent /></RouteTransition>) : (<NotFound />)} />
+                    <Route path="/admin/logs" element={can('admin_access') ? (<RouteTransition><AdminLogs /></RouteTransition>) : (<NotFound />)} />
                     <Route path="*" element={<NotFound />} />
                   </>
                 );

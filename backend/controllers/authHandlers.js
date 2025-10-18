@@ -51,9 +51,13 @@ export const login = async (req, res) => {
     if (!ok) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
+    await pool.query("UPDATE users SET last_login = NOW() WHERE id = $1", [user.id]);
     const payload = { sub: user.id, username: user.username };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-    return res.json({ token, user: { id: user.id, username: user.username, role: user.role, vpnCanCreate: user.vpn_can_create } });
+    // Load permissions
+    const permsQ = await pool.query("SELECT perm_key FROM user_permissions WHERE user_id = $1", [user.id]);
+    const permissions = permsQ.rows.map(r => r.perm_key);
+    return res.json({ token, user: { id: user.id, username: user.username, role: user.role, vpnCanCreate: user.vpn_can_create, permissions } });
   } catch (error) {
     console.error("login error", error);
     return res.status(500).json({ message: "Login failed", error: String(error) });
@@ -103,7 +107,9 @@ export const me = async (req, res) => {
     if (userQ.rows.length === 0) return res.status(404).json({ message: "User not found" });
     const u = userQ.rows[0];
     if (u.is_blocked) return res.status(403).json({ message: "User is blocked" });
-    return res.json({ user: { id: u.id, username: u.username, created_at: u.created_at, role: u.role, vpnCanCreate: u.vpn_can_create } });
+    const permsQ = await pool.query("SELECT perm_key FROM user_permissions WHERE user_id = $1", [u.id]);
+    const permissions = permsQ.rows.map(r => r.perm_key);
+    return res.json({ user: { id: u.id, username: u.username, created_at: u.created_at, role: u.role, vpnCanCreate: u.vpn_can_create, permissions } });
   } catch (error) {
     console.error("me error", error);
     return res.status(500).json({ message: "Failed to fetch user", error: String(error) });
