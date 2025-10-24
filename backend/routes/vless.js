@@ -7,7 +7,7 @@ import {
   getXrayUserTraffic,
   getVlessHistory,
   syncVlessStats,
-  getDefaultVlessEmail,
+  getXrayInboundTraffic,
 } from "../services/xray.js";
 
 const router = express.Router();
@@ -152,15 +152,15 @@ router.delete("/keys/:id", async (req, res) => {
   }
 });
 
-router.get("/stats/:email", requirePermission(["admin_access"]), async (req, res) => {
+router.get("/stats/:scope?", requirePermission(["admin_access"]), async (req, res) => {
   try {
-    const emailParam = String(req.params.email || "").trim();
-    const resolvedEmail =
-      emailParam && emailParam.toLowerCase() !== "default" ? emailParam : getDefaultVlessEmail();
-    if (!resolvedEmail) {
-      return res.status(400).json({ message: "email is required" });
+    const scopeParam = String(req.params.scope || "").trim();
+    const normalized = scopeParam.toLowerCase();
+    if (!scopeParam || normalized === "aggregate" || normalized === "default") {
+      const stats = await getXrayInboundTraffic();
+      return res.json({ stats: { ...stats, email: null } });
     }
-    const stats = await getXrayUserTraffic(resolvedEmail);
+    const stats = await getXrayUserTraffic(scopeParam);
     res.json({ stats });
   } catch (err) {
     if (err?.status === 503) {
@@ -185,19 +185,19 @@ router.post("/sync", requirePermission(["admin_access"]), async (req, res) => {
   }
 });
 
-router.get("/stats/history/:email", requirePermission(["admin_access"]), async (req, res) => {
+router.get("/stats/history/:scope?", requirePermission(["admin_access"]), async (req, res) => {
   try {
-    const emailParam = String(req.params.email || "").trim();
-    const resolvedEmail =
-      emailParam && emailParam.toLowerCase() !== "default" ? emailParam : getDefaultVlessEmail();
-    if (!resolvedEmail) {
-      return res.status(400).json({ message: "email is required" });
-    }
     const range = req.query?.range === "30" ? 30 : 7;
-    const history = await getVlessHistory(resolvedEmail, range);
+    const scopeParam = String(req.params.scope || "").trim();
+    const normalized = scopeParam.toLowerCase();
+    if (!scopeParam || normalized === "aggregate" || normalized === "default") {
+      const history = await getVlessHistory("aggregate", range);
+      return res.json(history);
+    }
+    const history = await getVlessHistory(scopeParam, range);
     res.json(history);
   } catch (err) {
-    console.error("GET /api/vless/stats/history/:email", err);
+    console.error("GET /api/vless/stats/history/:scope", err);
     res.status(500).json({ message: "Failed to load stats history" });
   }
 });

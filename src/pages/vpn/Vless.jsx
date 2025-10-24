@@ -9,10 +9,10 @@ import { useAuth } from "../../context/AuthContext.jsx";
 
 const MB = 1024 * 1024;
 const GB = MB * 1024;
-const DEFAULT_STATS_EMAIL_PARAM = "default";
+const DEFAULT_STATS_SCOPE = "aggregate";
 
 function formatDate(value) {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
@@ -59,6 +59,7 @@ function StatsTooltip({ active, payload, label }) {
 export default function Vless() {
   const { user } = useAuth();
   const isAdmin = user?.role === "ALL" || (user?.permissions || []).includes("admin_access");
+
   const { keys, loading, error, reload, createKey, updateKey, deleteKey } = useVlessKeys();
 
   const [isCreating, setIsCreating] = React.useState(false);
@@ -70,14 +71,16 @@ export default function Vless() {
   const [copyHint, setCopyHint] = React.useState(null);
 
   const [stats, setStats] = React.useState(null);
-  const [history, setHistory] = React.useState([]);
+  const [statsLabel, setStatsLabel] = React.useState("All VLESS keys");
   const [statsLoading, setStatsLoading] = React.useState(false);
-  const [historyLoading, setHistoryLoading] = React.useState(false);
   const [statsError, setStatsError] = React.useState(null);
-  const [lastUpdated, setLastUpdated] = React.useState(null);
+
+  const [history, setHistory] = React.useState([]);
   const [historyRange, setHistoryRange] = React.useState(7);
+  const [historyLoading, setHistoryLoading] = React.useState(false);
+
+  const [lastUpdated, setLastUpdated] = React.useState(null);
   const [syncing, setSyncing] = React.useState(false);
-  const [activeEmail, setActiveEmail] = React.useState(null);
 
   React.useEffect(() => {
     if (!copyHint) return undefined;
@@ -90,28 +93,25 @@ export default function Vless() {
     setStatsLoading(true);
     setStatsError(null);
     try {
-      const res = await apiAuthFetch(`/api/vless/stats/${encodeURIComponent(DEFAULT_STATS_EMAIL_PARAM)}`);
+      const res = await apiAuthFetch(`/api/vless/stats/${encodeURIComponent(DEFAULT_STATS_SCOPE)}`);
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         const message = payload?.error || payload?.message || `Failed to load stats (${res.status})`;
         throw new Error(message);
       }
-      const info = payload?.stats;
+      const info = payload?.stats || null;
       if (info) {
-        const normalized = {
-          email: info.email || null,
-          uplink: Number(info.uplink || 0),
-          downlink: Number(info.downlink || 0),
-          total: Number(info.total || 0),
-        };
-        setStats(normalized);
-        if (normalized.email) setActiveEmail(normalized.email);
-        setLastUpdated(new Date());
+        setStats(info);
+        const label = info.label || info.tag || "All VLESS keys";
+        setStatsLabel(label);
       } else {
         setStats(null);
+        setStatsLabel("All VLESS keys");
       }
+      setLastUpdated(new Date());
     } catch (err) {
       setStats(null);
+      setStatsLabel("All VLESS keys");
       setStatsError(err?.message || "Failed to load stats");
     } finally {
       setStatsLoading(false);
@@ -125,7 +125,7 @@ export default function Vless() {
       setHistoryLoading(true);
       try {
         const res = await apiAuthFetch(
-          `/api/vless/stats/history/${encodeURIComponent(DEFAULT_STATS_EMAIL_PARAM)}?range=${value}`
+          `/api/vless/stats/history/${encodeURIComponent(DEFAULT_STATS_SCOPE)}?range=${value}`
         );
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -134,8 +134,7 @@ export default function Vless() {
         }
         const list = Array.isArray(payload?.history)
           ? payload.history.map((entry) => ({
-              id: entry.id,
-              email: entry.email,
+              id: entry.id || entry.created_at,
               uplink: Number(entry.uplink || 0),
               downlink: Number(entry.downlink || 0),
               total: Number(entry.total || 0),
@@ -143,7 +142,6 @@ export default function Vless() {
             }))
           : [];
         setHistory(list);
-        if (payload?.email) setActiveEmail(payload.email);
       } catch (err) {
         setStatsError(err?.message || "Failed to load stats history");
         setHistory([]);
@@ -299,7 +297,7 @@ export default function Vless() {
             <div className="space-y-3">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">VLESS traffic</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Live counters pulled from the Xray gRPC API. Sync to persist a new snapshot and refresh totals.
+                Aggregate uplink/downlink counters fetched from the Xray gRPC API for all keys.
               </p>
               {statsError && (
                 <div className="rounded-2xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
@@ -308,7 +306,7 @@ export default function Vless() {
               )}
               <div className="grid gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <div>
-                  <span className="font-semibold">User:</span> {activeEmail || "—"}
+                  <span className="font-semibold">Scope:</span> {statsLabel}
                 </div>
                 <div>
                   <span className="font-semibold">Uplink:</span> {uplinkMB.toFixed(2)} MB
@@ -320,7 +318,7 @@ export default function Vless() {
                   <span className="font-semibold">Total:</span> {totalGB.toFixed(2)} GB
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Last updated: {lastUpdated ? lastUpdated.toLocaleString() : "—"}
+                  Last updated: {statsLoading ? "Loading…" : lastUpdated ? lastUpdated.toLocaleString() : "—"}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -337,14 +335,20 @@ export default function Vless() {
                   <button
                     type="button"
                     onClick={() => handleRangeChange(7)}
-                    className={`rounded-full px-3 py-1 transition ${historyRange === 7 ? "bg-gray-200 dark:bg-gray-700" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+                    className={`rounded-full px-3 py-1 transition ${
+                      historyRange === 7 ? "bg-gray-200 dark:bg-gray-700" : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
                   >
                     7 days
                   </button>
                   <button
                     type="button"
                     onClick={() => handleRangeChange(30)}
-                    className={`rounded-full px-3 py-1 transition ${historyRange === 30 ? "bg-gray-200 dark:bg-gray-700" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+                    className={`rounded-full px-3 py-1 transition ${
+                      historyRange === 30
+                        ? "bg-gray-200 dark:bg-gray-700"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
                   >
                     30 days
                   </button>
@@ -356,7 +360,7 @@ export default function Vless() {
                 <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
                   Loading history…
                 </div>
-              ) : (
+              ) : chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
                     <defs>
@@ -377,6 +381,10 @@ export default function Vless() {
                     <Area type="monotone" dataKey="downlinkMB" name="Downlink" stroke="#22c55e" fill="url(#downlink)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                  No history captured yet.
+                </div>
               )}
             </div>
           </div>
@@ -476,12 +484,24 @@ export default function Vless() {
           <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
             <thead className="bg-gray-50/80 dark:bg-slate-900/60">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Name</th>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">UUID</th>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Comment</th>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Traffic</th>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Created</th>
-                <th scope="col" className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-200">Actions</th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  Name
+                </th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  UUID
+                </th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  Comment
+                </th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  Traffic
+                </th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  Created
+                </th>
+                <th scope="col" className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-200">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white/60 dark:divide-gray-700 dark:bg-slate-900/40">

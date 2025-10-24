@@ -12,6 +12,7 @@ const XRAY_API_HOST = process.env.XRAY_API_HOST || "127.0.0.1";
 const XRAY_API_PORT = Number(process.env.XRAY_API_PORT || 10085);
 const XRAY_API_EMAIL_FIELD = process.env.XRAY_API_EMAIL_FIELD || "";
 const XRAY_CONFIG_PATH = process.env.XRAY_CONFIG_PATH || "/usr/local/etc/xray/config.json";
+const XRAY_INBOUND_TAG = process.env.XRAY_INBOUND_TAG || "vless-in";
 
 const ONE_MB = 1024 * 1024;
 
@@ -76,6 +77,32 @@ export async function getXrayUserTraffic(emailParam) {
     };
   } catch (error) {
     console.error(`[xray] getXrayUserTraffic failed for ${email}`, error);
+    if (error?.code === grpc.status.UNAVAILABLE) {
+      const err = new Error("Xray API unreachable");
+      err.status = 503;
+      throw err;
+    }
+    throw error;
+  }
+}
+
+export async function getXrayInboundTraffic(tagParam) {
+  const tag = (tagParam || XRAY_INBOUND_TAG || "").trim();
+  const baseName = `inbound>>>${tag}>>>traffic>>>`;
+  try {
+    const [uplink, downlink] = await Promise.all([
+      callGetStats(`${baseName}uplink`),
+      callGetStats(`${baseName}downlink`),
+    ]);
+    return {
+      tag,
+      uplink,
+      downlink,
+      total: uplink + downlink,
+      label: `Inbound: ${tag}`,
+    };
+  } catch (error) {
+    console.error(`[xray] getXrayInboundTraffic failed for tag ${tag}`, error);
     if (error?.code === grpc.status.UNAVAILABLE) {
       const err = new Error("Xray API unreachable");
       err.status = 503;
@@ -153,11 +180,39 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
 }
 
 export async function getVlessHistory(emailParam, days) {
-  const email = (emailParam || XRAY_API_EMAIL_FIELD || "").trim();
-  if (!email) {
-    throw new Error("Email is required for stats history");
-  }
   const range = Number(days) === 30 ? 30 : 7;
+  const raw = String(emailParam || "").trim();
+  if (!raw || raw.toLowerCase() === "aggregate" || raw.toLowerCase() === "default") {
+    const { rows } = await pool.query(
+      `
+        SELECT
+          MIN(id) AS id,
+          NULL::text AS email,
+          SUM(uplink) AS uplink,
+          SUM(downlink) AS downlink,
+          SUM(total) AS total,
+          created_at
+        FROM vless_stats
+        WHERE created_at >= NOW() - ($1 || ' days')::interval
+        GROUP BY created_at
+        ORDER BY created_at ASC
+      `,
+      [String(range)]
+    );
+    return {
+      email: null,
+      range,
+      history: rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        uplink: Number(row.uplink || 0),
+        downlink: Number(row.downlink || 0),
+        total: Number(row.total || 0),
+        created_at: row.created_at,
+      })),
+    };
+  }
+  const email = raw;
   const { rows } = await pool.query(
     `
       SELECT id, email, uplink, downlink, total, created_at
@@ -180,6 +235,10 @@ export async function getVlessHistory(emailParam, days) {
 
 export function getDefaultVlessEmail() {
   return XRAY_API_EMAIL_FIELD;
+}
+
+export async function listKnownVlessEmails() {
+  return readConfigEmails();
 }
 
 // Keeping the original placeholder for compatibility with existing code paths.
