@@ -1,65 +1,64 @@
-# Personal Portal — состояние проекта
+# Personal Portal — актуальное состояние проекта
 
-## Обзор фронтенда
+## Архитектура и стек
+- **Фронтенд**: React 18 + Vite, маршрутизация на `react-router-dom`, анимации `framer-motion`, уведомления `react-hot-toast`, графики `recharts`, стили через Tailwind (`darkMode: "class"`). 【F:package.json†L1-L22】【F:tailwind.config.js†L1-L6】
+- **Бэкенд**: Node.js + Express, база PostgreSQL через `pg`, дополнительный HTTP‑клиент `undici` для Outline API и `web-push` для уведомлений. 【F:backend/package.json†L1-L18】
+- **Стартовые сервисы**: backend и frontend разворачиваются независимо; взаимодействие происходит через REST API (`VITE_API_BASE_URL`). 【F:src/utils/api.js†L1-L22】
 
-- **Главная (`/`)** — приветственный экран с быстрыми ссылками на ключевые разделы и локальным списком задач в `localStorage`.
-  - Быстрые ссылки ведут к «Аналитике», «Нейронкам», «Документации» и «VPN».
-  - Список задач поддерживает добавление, отметку выполнения и удаление, данные сохраняются в `localStorage`.
-- **Аналитика (`/analytics`)** — каталог из четырёх статей, каждая открывается в модальном окне для полного текста:
-  1. «API Gateway (KrakenD)» — про конфигурацию шлюза.
-  2. «GraphQL» — о декларативных запросах и примере запроса.
-  3. «OData» — стандарт унифицированных параметров выборки.
-  4. «Postman — мини-инструкция» — тестирование API и примеры скриптов.
-  - Раздел включает элементы управления (поиск, фильтр по темам) и теги навыков.
-- **Нейросервисы (`/ai`)** — карточки инструментов (ChatGPT, Midjourney, Perplexity, памятка по промтам) с модальными подробностями и статусами.
-- **Документация (`/docs`)** — три группы ссылок: продуктовые гайды, технические справочники и командные процессы.
-- **Посты (`/posts`)** — быстрые заметки, хранящиеся в `localStorage`, с датой создания и сортировкой по убыванию.
-- **VPN (`/vpn`)** — хаб, ведущий к заготовкам для Outline и VLESS.
-  - Подстраницы описывают будущий функционал по управлению ключами, пока отображают заглушки и кнопки «Добавить ключ».
-- **Настройки (`/settings`)** — форма профиля (имя, email, телефон) и переключатель светлой/тёмной темы.
-  - Профиль сохраняется через API `/api/user/profile`, данные подгружаются при открытии страницы.
-- **Админ-панель (`/admin`)** — доступна только роли `ALL`, включает дашборд с карточками перехода и системными метриками (CPU, диск, трафик, аптайм).
-  - Подстраницы: управление пользователями, контентом (статьи/посты/ссылки) и журналом событий.
+## Фронтенд: структура и функциональность
+### Каркас интерфейса
+- Компонент `App` регистрирует push‑подписку, хранит глобальный AuthContext и рисует маршруты с анимацией. 【F:src/App.jsx†L1-L119】
+- Общий каркас страницы задаёт `PageShell` (фон, шапка, область контента), `Header` отображает пользователя, уведомления и переключатель темы, а `Sidebar` управляет навигацией, включая мобильные свайпы и сворачивание. 【F:src/components/PageShell.jsx†L1-L33】【F:src/components/Header.jsx†L1-L104】【F:src/components/Sidebar.jsx†L1-L160】
+
+### Основные разделы
+- **Главная (`/`)** — дерево задач с вложенностью, drag & drop и модальными окнами для добавления/редактирования, данные тянутся из `/api/todos`; на первом экране также быстрые ссылки на ключевые разделы. 【F:src/pages/Home.jsx†L1-L118】【F:src/pages/Home.jsx†L200-L320】
+- **Аналитика (`/analytics`)** — карточки статей с фильтрами и модальным просмотром. 【F:src/pages/Analytics.jsx†L1-L140】
+- **Нейросервисы (`/ai`)** — справочник по AI‑инструментам с подробными описаниями и статусами. 【F:src/pages/AI.jsx†L1-L132】
+- **Документация (`/docs`)** — каталог внешних ссылок и просмотр внутренних MD‑файлов, загружаемых напрямую. 【F:src/pages/Docs.jsx†L1-L140】
+- **Заметки (`/posts`)** — список заметок с optimistic UI поверх REST API `/api/posts`. 【F:src/pages/Posts.jsx†L1-L96】
+- **VPN** — хаб `/vpn`, страницы Outline с управлением ключами/лимитами и заглушка VLESS. Outline использует хук `useOutlineKeys` для загрузки ключей, метрик и лимитов. 【F:src/App.jsx†L200-L272】【F:src/pages/vpn/Outline.jsx†L1-L160】【F:src/hooks/useOutlineKeys.js†L1-L120】【F:src/pages/vpn/VLESS.jsx†L1-L33】
+- **Настройки (`/settings`)** — профиль пользователя (GET/PUT `/api/user/profile`) и переключатель темы. 【F:src/pages/Settings.jsx†L1-L120】
+- **Админ‑панель (`/admin/*`)** — дашборд со статистикой сервера, карточками перехода, таблицами пользователей/контента/логов и отправкой событий в push. 【F:src/pages/admin/Index.jsx†L1-L78】【F:src/pages/admin/Users.jsx†L1-L160】【F:src/pages/admin/Content.jsx†L1-L120】【F:src/pages/admin/Logs.jsx†L1-L80】
+
+### Глобальные UX‑паттерны
+- Тематический режим хранится в `useTheme` и синхронизируется через `localStorage`. 【F:src/hooks/useTheme.js†L1-L120】
+- Уведомления открываются из шапки; хук `useNotifications` хранит непрочитанные в IndexedDB и синхронизируется с `/api/notifications`. 【F:src/hooks/useNotifications.js†L1-L96】
+- Service Worker `sw.js` показывает push‑уведомления и возвращает пользователя в приложение при клике. 【F:public/sw.js†L1-L48】
 
 ## Бэкенд и API
+- Точка входа `backend/index.js` настраивает Express, регистрирует маршруты, создаёт таблицы и эндпоинт `/api/system-stats`. 【F:backend/index.js†L1-L140】【F:backend/index.js†L140-L196】
+- Подключение к PostgreSQL через `backend/db/connect.js`. 【F:backend/db/connect.js†L1-L16】
 
-- Node.js + Express, PostgreSQL через `pg`, конфигурация в `backend/index.js`.
-- Автоинициализация таблиц: `users`, `user_profiles`, `content_items`, `admin_logs`.
-- Системный эндпоинт `/api/system-stats` возвращает загрузку CPU, памяти и uptime.
+### Основные модули
+- **Аутентификация (`/api/auth`)** — регистрация, логин, проверка токена и сброс пароля. Контроллер `authHandlers` возвращает JWT и список прав пользователя. 【F:backend/routes/auth.js†L1-L14】【F:backend/controllers/authHandlers.js†L1-L120】
+- **Профиль (`/api/user/profile`)** — CRUD профиля пользователя. 【F:backend/routes/user.js†L1-L44】
+- **Задачи (`/api/todos`)** — древовидные todo, drag & drop порядок, optimistic обновления. 【F:backend/routes/todos.js†L1-L120】
+- **Заметки (`/api/posts`)** — хранение коротких постов. 【F:backend/routes/posts.js†L1-L60】
+- **Админка (`/api/admin/*`)** — управление пользователями, контентом, логами и правами с защитой `requirePermission('admin_access')`; добавление логов отправляет push всем подписчикам. 【F:backend/routes/admin.js†L1-L200】【F:backend/routes/admin.js†L200-L260】
+- **VPN (`/api/vpn/outline/*`)** — прокси к Outline API с кэшем, проверкой прав на создание ключей, управлением лимитами и метриками. 【F:backend/routes/vpn.js†L1-L200】
+- **Уведомления (`/api/notifications`)** — выдача событий журнала и сохранение push‑подписок. 【F:backend/routes/notifications.js†L1-L60】
 
-### Аутентификация и профиль пользователя
+### База данных
+- Автоинициализация таблиц: `users`, `user_profiles`, `user_todos`, `user_posts`, `permissions`, `user_permissions`, `content_items`, `admin_logs`, `push_subscriptions`. 【F:backend/index.js†L24-L132】
+- Таблица `user_todos` хранит родителя и позицию для дерева задач; `permissions` и `user_permissions` реализуют гибкий RBAC. 【F:backend/index.js†L52-L104】
 
-1. **Регистрация** (`POST /api/auth/register`): проверка уникальности имени пользователя, хэширование пароля `bcrypt`, сохранение роли `NON_ADMIN` и флага `vpn_can_create=false` по умолчанию.
-2. **Логин** (`POST /api/auth/login`): проверка блокировки, сравнение хэшированного пароля, выдача JWT (`sub`, `username`), ответ содержит роль и право создания VPN.
-3. **Сохранение сессии на фронте**: токен пишется в `localStorage`, пользователь хранится в контексте `AuthContext`. При монтировании происходит запрос `GET /api/auth/me` для валидации токена.
-4. **Сброс пароля** (`POST /api/auth/reset-password`): поиск пользователя, обновление хэша.
-5. **Профиль пользователя** (`GET/PUT /api/user/profile`): доступен только авторизованным; хранит имя, email и телефон в таблице `user_profiles`.
+## Аутентификация и авторизация
+- JWT хранится в `localStorage`, контекст `AuthContext` валидирует токен при монтировании и отдаёт пользователя с ролями/правами. 【F:src/context/AuthContext.jsx†L1-L64】
+- Middleware `authRequired`, `requireRole` и `requirePermission` проверяют токен, статус блокировки и набор прав, роль `ALL` имеет полный доступ. 【F:backend/middleware/auth.js†L1-L60】
+- Клиентские маршруты сверяют права (`view_analytics`, `view_ai`, `view_vpn`, `admin_access`) перед рендером страниц. 【F:src/App.jsx†L120-L208】
 
-### Контроль доступа и роли
+## Уведомления и push
+- `registerPush` регистрирует Service Worker, запрашивает разрешение, подписывает пользователя через VAPID и отправляет подписку на бэкенд. 【F:src/push/registerPush.js†L1-L56】
+- Серверный модуль `utils/push.js` конфигурируется через `WEB_PUSH_*` и рассылает уведомления всем подписчикам. 【F:backend/utils/push.js†L1-L36】
 
-- В JWT-среде определены роли: `ALL`, `NON_ADMIN`, `ANALYTICS`, `NEURAL`, `VPN`.
-- Middleware `authRequired` проверяет наличие и валидность токена; `requireRole(["ALL"])` ограничивает доступ к административным маршрутам.
-- На фронтенде маршруты проверяют роль пользователя:
-  - `ALL` — полный доступ, включая админ-панель.
-  - `NON_ADMIN` — все основные разделы, без административных.
-  - `ANALYTICS` — только «Аналитика» и общие страницы.
-  - `NEURAL` — доступ к «Нейросервисам» и общему контенту.
-  - `VPN` — доступ к разделам VPN.
-- Админ-подразделы:
-  - **Пользователи** — таблица с полями профиля, изменением роли, флагом `vpn_can_create` и блокировкой.
-  - **Контент** — CRUD для статей/постов/ссылок портала.
-  - **Журнал** — просмотр и добавление записей в `admin_logs`.
+## Конфигурация окружения
+- **Фронтенд `.env`**: `VITE_API_BASE_URL`, `VITE_VAPID_PUBLIC_KEY` (для push). 【F:src/utils/api.js†L1-L22】【F:src/push/registerPush.js†L17-L48】
+- **Бэкенд `.env`**: параметры PostgreSQL (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`), JWT (`JWT_SECRET`, `JWT_EXPIRES_IN`), Outline (`OUTLINE_API_URL`, `OUTLINE_CACHE_TTL_MS`, `OUTLINE_API_INSECURE`), push (`WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, `WEB_PUSH_CONTACT`). 【F:backend/db/connect.js†L1-L16】【F:backend/routes/vpn.js†L1-L48】【F:backend/utils/push.js†L1-L26】
 
-## Локальное состояние и UX-паттерны
+## Сборка и деплой
+- Скрипты npm: `npm run dev`/`build`/`preview` на фронте, `npm run start`/`dev` в backend. 【F:package.json†L5-L14】【F:backend/package.json†L5-L13】
+- `deploy.sh` бережно сохраняет `.env`, обновляет репозиторий, собирает фронт, устанавливает зависимости, перезапускает systemd‑сервис backend и перезагружает Nginx. 【F:deploy.sh†L1-L120】
+- Эндпоинт `/api/system-stats` используется админкой для отображения метрик с мок‑значениями при недоступности сервера. 【F:backend/index.js†L140-L196】【F:src/utils/systemInfo.js†L1-L18】
 
-- Модальные окна для чтения статей (компонент `ArticleModal`).
-- Уведомления `react-hot-toast` для авторизации, сохранения профиля и админ-действий.
-- Темизация на основе кастомного хука `useTheme`, состояние сохраняется в `localStorage`.
-- Mobile-friendly сайдбар с жестами свайпа, контролируемый через глобальный `window.__toggleSidebar`.
-
-## Идеи для следующих шагов
-
-- Подключить реальные данные в разделах VPN и аналитики (например, подгрузка метрик).
-- Реализовать синхронизацию постов/задач через бэкенд.
-- Добавить историю уведомлений/новостей с бэкенда.
-
+## Документация в репозитории
+- `docs/` содержит тематические карты по синхронизации задач, VPN, уведомлениям, RBAC и новым разделам (см. README внутренних страниц). Страница `/docs` показывает эти материалы напрямую. 【F:src/pages/Docs.jsx†L86-L138】
