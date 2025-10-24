@@ -516,6 +516,7 @@ export default function Vless() {
                   const statsJson = key.stats_json || {};
                   const bytesUp = formatBytes(statsJson.bytes_up);
                   const bytesDown = formatBytes(statsJson.bytes_down);
+                  const bytesTotal = formatBytes(statsJson.total);
                   const isEditing = editingId === key.id;
                   return (
                     <tr key={key.id}>
@@ -559,8 +560,24 @@ export default function Vless() {
                         )}
                       </td>
                       <td className="px-4 py-3 align-top text-sm text-gray-600 dark:text-gray-400">
-                        <div>Up: {bytesUp}</div>
-                        <div>Down: {bytesDown}</div>
+                        <div className="flex flex-col gap-1">
+                          <div className="inline-flex items-center gap-2 text-xs">
+                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+                              Up
+                            </span>
+                            <span>{bytesUp}</span>
+                          </div>
+                          <div className="inline-flex items-center gap-2 text-xs">
+                            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700 dark:bg-sky-500/10 dark:text-sky-200">
+                              Down
+                            </span>
+                            <span>{bytesDown}</span>
+                          </div>
+                          <div className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                            <span>Total</span>
+                            <span>{bytesTotal}</span>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 align-top text-sm text-gray-600 dark:text-gray-400">
                         {formatDate(key.created_at)}

@@ -45,6 +45,7 @@
   - Header with shortcut to the setup guide.
   - Admin-only “VLESS Traffic” card showing aggregate totals, manual sync, 7/30 day toggle, and a Recharts area chart.
   - Create/edit/delete flow for keys plus clipboard helpers.
+- When the sync job runs, it attempts to map e-mail statistics back onto keys whose `name` or `comment` matches the e-mail (case-insensitive) and stores the latest counters in `vless_keys.stats_json` so the table shows per-user usage.
 - Guides:
   - `src/pages/vpn/VlessGuide.jsx` — client installation walkthrough with screenshots.
   - `src/pages/vpn/RoutesGuide.jsx` — selective proxy routing setup.

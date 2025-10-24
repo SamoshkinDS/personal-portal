@@ -167,6 +167,20 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
           "INSERT INTO vless_stats (email, uplink, downlink) VALUES ($1, $2, $3)",
           [email, stats.uplink, stats.downlink]
         );
+        await pool.query(
+          `
+            UPDATE vless_keys
+            SET stats_json = jsonb_build_object(
+              'bytes_up', $2,
+              'bytes_down', $3,
+              'total', $4,
+              'synced_at', NOW()
+            )
+            WHERE LOWER(name) = LOWER($1)
+               OR LOWER(comment) = LOWER($1)
+          `,
+          [email, stats.uplink, stats.downlink, stats.total]
+        );
       }
       results.push({ ...stats, persisted: changed });
     } catch (error) {
