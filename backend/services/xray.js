@@ -1,4 +1,4 @@
-import fs from "fs/promises";
+﻿import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import grpc from "@grpc/grpc-js";
@@ -190,8 +190,40 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
     keyRows = res.rows || [];
   }
   if (targets.length === 0) {
+  // Fallback: update keys from the latest values already stored in vless_stats
+  try {
+    const { rows } = await pool.query(`
+      SELECT DISTINCT ON (email)
+        email, uplink, downlink, total, created_at
+      FROM vless_stats
+      ORDER BY email, created_at DESC
+    `);
+    const results = [];
+    for (const row of rows) {
+      const email = String(row.email || '').trim();
+      const uplink = Number(row.uplink || 0);
+      const downlink = Number(row.downlink || 0);
+      const total = Number(row.total || uplink + downlink);
+      await pool.query(`
+        UPDATE vless_keys
+        SET stats_json = jsonb_build_object(
+          'bytes_up', $2,
+          'bytes_down', $3,
+          'total', $4,
+          'synced_at', NOW()
+        )
+        WHERE TRIM(LOWER(name)) = TRIM(LOWER($1))
+           OR TRIM(LOWER(comment)) = TRIM(LOWER($1))
+           OR LOWER(comment) LIKE '%' || TRIM(LOWER($1)) || '%'
+      `, [email, uplink, downlink, total]);
+      results.push({ email, uplink, downlink, total, persisted: false });
+    }
+    return results;
+  } catch (e) {
+    console.warn('[xray] Fallback update from vless_stats failed', e.message || e);
     return [];
   }
+}
   const results = [];
   for (const email of targets) {
     try {
@@ -309,3 +341,4 @@ export async function getStatsByUUID(uuid) {
 }
 
 export const MB_BYTES = ONE_MB;
+
