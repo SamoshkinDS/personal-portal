@@ -202,8 +202,9 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
             'total', $4,
             'synced_at', NOW()
           )
-          WHERE LOWER(name) = LOWER($1)
-             OR LOWER(comment) = LOWER($1)
+          WHERE TRIM(LOWER(name)) = TRIM(LOWER($1))
+             OR TRIM(LOWER(comment)) = TRIM(LOWER($1))
+             OR LOWER(comment) LIKE '%' || TRIM(LOWER($1)) || '%'
         `,
         [email, stats.uplink, stats.downlink, stats.total]
       );
