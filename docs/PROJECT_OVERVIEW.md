@@ -16,7 +16,7 @@
 - **Нейросервисы (`/ai`)** — справочник по AI‑инструментам с подробными описаниями и статусами. 【F:src/pages/AI.jsx†L1-L132】
 - **Документация (`/docs`)** — каталог внешних ссылок и просмотр внутренних MD‑файлов, загружаемых напрямую. 【F:src/pages/Docs.jsx†L1-L140】
 - **Заметки (`/posts`)** — список заметок с optimistic UI поверх REST API `/api/posts`. 【F:src/pages/Posts.jsx†L1-L96】
-- **VPN** — хаб `/vpn`, страницы Outline с управлением ключами/лимитами и заглушка VLESS. Outline использует хук `useOutlineKeys` для загрузки ключей, метрик и лимитов. 【F:src/App.jsx†L200-L272】【F:src/pages/vpn/Outline.jsx†L1-L160】【F:src/hooks/useOutlineKeys.js†L1-L120】【F:src/pages/vpn/VLESS.jsx†L1-L33】
+- **VPN** — хаб `/vpn`, страницы Outline с управлением ключами/лимитами и VLESS-страница. Outline использует хук `useOutlineKeys` для загрузки ключей, метрик и лимитов. 【F:src/App.jsx†L200-L272】【F:src/pages/vpn/Outline.jsx†L1-L160】【F:src/hooks/useOutlineKeys.js†L1-L120】【F:src/pages/vpn/Vless.jsx†L1-L300】
 - **Настройки (`/settings`)** — профиль пользователя (GET/PUT `/api/user/profile`) и переключатель темы. 【F:src/pages/Settings.jsx†L1-L120】
 - **Админ‑панель (`/admin/*`)** — дашборд со статистикой сервера, карточками перехода, таблицами пользователей/контента/логов и отправкой событий в push. 【F:src/pages/admin/Index.jsx†L1-L78】【F:src/pages/admin/Users.jsx†L1-L160】【F:src/pages/admin/Content.jsx†L1-L120】【F:src/pages/admin/Logs.jsx†L1-L80】
 

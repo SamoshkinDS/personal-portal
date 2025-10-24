@@ -24,7 +24,9 @@ import AdminUsers from "./pages/admin/Users.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import Home from "./pages/Home.jsx";
 import Outline from "./pages/vpn/Outline.jsx";
-import VLESS from "./pages/vpn/VLESS.jsx";
+import Vless from "./pages/vpn/Vless.jsx";
+import VlessGuide from "./pages/vpn/VlessGuide.jsx";
+import RoutesGuide from "./pages/vpn/RoutesGuide.jsx";
 import VPNIndex from "./pages/vpn/Index.jsx";
 import OutlineGuide from "./pages/vpn/OutlineGuide.jsx";
 import { useEffect } from "react";
@@ -249,7 +251,31 @@ function AppRoutes() {
                       element={
                         allowVPN ? (
                           <RouteTransition>
-                            <VLESS />
+                            <Vless />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/vpn/vless/guide"
+                      element={
+                        allowVPN ? (
+                          <RouteTransition>
+                            <VlessGuide />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/vpn/vless/routes-guide"
+                      element={
+                        allowVPN ? (
+                          <RouteTransition>
+                            <RoutesGuide />
                           </RouteTransition>
                         ) : (
                           <NotFound />
@@ -293,4 +319,3 @@ export default function App() {
     </Router>
   );
 }
-

@@ -1,14 +1,17 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import cron from "node-cron";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import userRoutes from "./routes/user.js";
 import todosRoutes from "./routes/todos.js";
 import postsRoutes from "./routes/posts.js";
 import vpnRoutes from "./routes/vpn.js";
+import vlessRoutes from "./routes/vless.js";
 import notificationsRoutes from "./routes/notifications.js";
 import { pool } from "./db/connect.js";
+import { syncVlessStats } from "./services/xray.js";
 import os from "os";
 
 dotenv.config();
@@ -27,7 +30,23 @@ app.use("/api/user", userRoutes);
 app.use("/api/todos", todosRoutes);
 app.use("/api/posts", postsRoutes);
 app.use("/api/vpn", vpnRoutes);
+app.use("/api/vless", vlessRoutes);
 app.use("/api/notifications", notificationsRoutes);
+
+const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
+
+if (XRAY_CRON_ENABLED) {
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      const results = await syncVlessStats();
+      if (results.length > 0) {
+        console.log(`[cron] Synced VLESS stats for ${results.length} user(s)`);
+      }
+    } catch (err) {
+      console.warn("[cron] VLESS stats sync failed", err.message || err);
+    }
+  });
+}
 
 // Ensure DB tables and columns exist
 (async () => {
@@ -141,7 +160,30 @@ app.use("/api/notifications", notificationsRoutes);
       );
       CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id ON push_subscriptions(user_id);
     `);
-    console.log("DB: users, user_profiles, user_todos, user_posts, content_items, admin_logs, push_subscriptions, permissions, user_permissions are ready");
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS vless_keys (
+        id SERIAL PRIMARY KEY,
+        uuid UUID NOT NULL,
+        name TEXT NOT NULL,
+        comment TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        stats_json JSONB DEFAULT '{}'::jsonb
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_vless_keys_uuid ON vless_keys(uuid);
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS vless_stats (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        uplink BIGINT DEFAULT 0,
+        downlink BIGINT DEFAULT 0,
+        total BIGINT GENERATED ALWAYS AS (uplink + downlink) STORED,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_vless_stats_email_created_at
+        ON vless_stats(email, created_at DESC);
+    `);
+    console.log("DB: users, user_profiles, user_todos, user_posts, content_items, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats are ready");
   } catch (err) {
     console.error("DB init error", err);
   }

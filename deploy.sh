@@ -1,131 +1,77 @@
 #!/bin/bash
 set -e
 
-# ===============================
-# 🚀 Personal Portal — Deploy Script (frontend env + backend env)
-# ===============================
-# Выполняется автоматически через:
-#   npm run deploy
-# или вручную:
-#   bash deploy.sh
-#
-# 🔧 Что делает:
-# 1. Сохраняет все .env файлы фронта и бэка
-# 2. Обновляет код из GitHub
-# 3. Восстанавливает .env файлы
-# 4. Собирает фронт и перезапускает бэк
-# 5. Проверяет nginx и API
-# ===============================
-
 PROJECT_DIR="/var/www/personal-portal"
 BACKEND_DIR="$PROJECT_DIR/backend"
 BRANCH="main"
 SERVICE_NAME="personal-portal-backend"
 BACKUP_DIR="/tmp/personal-portal-env-backup"
 
-mkdir -p "$BACKUP_DIR"
-
-# --- Пути к env-файлам ---
-ENV_FILES_FRONT=(
-  "$PROJECT_DIR/.env"
-  "$PROJECT_DIR/.env.production"
-  "$PROJECT_DIR/.env.development"
-)
-ENV_FILES_BACK=(
-  "$BACKEND_DIR/.env"
-)
-
 echo "=== 🚀 Starting deploy at $(date) ==="
-cd "$PROJECT_DIR" || { echo "❌ ERROR: Project folder not found"; exit 1; }
 
-# --- 0️⃣ BACKUP ENV FILES ---
+# 🧾 Проверка прав и попытка автоисправления
+if [ ! -w "$PROJECT_DIR" ]; then
+  echo "⚠️ Недостаточно прав на $PROJECT_DIR, пытаюсь исправить..."
+  sudo chown -R $(whoami):www-data "$PROJECT_DIR" || echo "⚠️ Не удалось сменить владельца (нужен sudo)"
+  sudo chmod -R 775 "$PROJECT_DIR" || echo "⚠️ Не удалось применить chmod (нужен sudo)"
+fi
+
+# 💾 Резервная копия .env перед обновлением
 echo "💾 Backing up environment files..."
-for FILE in "${ENV_FILES_FRONT[@]}" "${ENV_FILES_BACK[@]}"; do
-  if [ -f "$FILE" ]; then
-    BASENAME=$(basename "$FILE")
-    cp "$FILE" "$BACKUP_DIR/$BASENAME"
-    echo "✅ Saved $BASENAME"
-  else
-    echo "⚠️ Skipped missing $FILE"
-  fi
-done
+mkdir -p "$BACKUP_DIR"
+if [ -f "$BACKEND_DIR/.env" ]; then
+  cp "$BACKEND_DIR/.env" "$BACKUP_DIR/" 2>/dev/null || sudo cp "$BACKEND_DIR/.env" "$BACKUP_DIR/"
+fi
 
-# --- 1️⃣ GIT UPDATE ---
+# 📦 GIT update
+cd "$PROJECT_DIR"
 echo "📦 Updating repository..."
-if ! git fetch origin "$BRANCH"; then
-  echo "⚠️ Git fetch failed! Проверь подключение к GitHub."
-  exit 1
-fi
+git fetch origin "$BRANCH" || { echo "⚠️ Git fetch failed"; exit 1; }
+git reset --hard "origin/$BRANCH" || { echo "⚠️ Git reset failed"; exit 1; }
 
-if ! git reset --hard "origin/$BRANCH"; then
-  echo "⚠️ Git reset failed! Возможно, локальные изменения блокируют pull."
-  echo "Используй 'git status' и 'git stash' вручную."
-  exit 1
-fi
-
-# --- 2️⃣ RESTORE ENV FILES ---
-echo "♻️ Restoring environment files..."
-for FILE in "${ENV_FILES_FRONT[@]}" "${ENV_FILES_BACK[@]}"; do
-  BASENAME=$(basename "$FILE")
-  TARGET_DIR=$(dirname "$FILE")
-  if [ -f "$BACKUP_DIR/$BASENAME" ]; then
-    mv "$BACKUP_DIR/$BASENAME" "$TARGET_DIR/$BASENAME"
-    echo "✅ Restored $BASENAME"
-  fi
-done
-
-# --- 3️⃣ FRONTEND ---
+# 🧩 Установка зависимостей фронта
 echo "🧩 Installing frontend dependencies..."
 if ! npm ci --no-audit --no-fund; then
-  echo "⚠️ npm install failed! Попробуй очистить кэш: 'sudo rm -rf node_modules package-lock.json && npm install'"
-  exit 1
+  echo "⚠️ npm install failed, пытаюсь исправить права и повторить..."
+  sudo chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
+  sudo chmod -R 775 node_modules package-lock.json 2>/dev/null || true
+  npm ci --no-audit --no-fund || { echo "❌ npm install все еще не удалось"; exit 1; }
 fi
 
+# 🏗️ Сборка фронтенда
 echo "🏗️ Building frontend..."
-if ! npm run build; then
-  echo "❌ Frontend build failed! Проверь vite.config.js и ошибки выше."
-  exit 1
-fi
+npm run build || { echo "❌ Frontend build failed"; exit 1; }
 
-# --- 4️⃣ BACKEND ---
+# 🛠️ Backend
 echo "🛠️ Updating backend..."
-cd "$BACKEND_DIR" || { echo "❌ Backend folder missing"; exit 1; }
-
+cd "$BACKEND_DIR"
 if ! npm ci --no-audit --no-fund; then
-  echo "⚠️ Backend npm install failed! Попробуй удалить node_modules и установить заново."
-  exit 1
+  echo "⚠️ Backend npm install failed, пытаюсь исправить права..."
+  sudo chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
+  sudo chmod -R 775 node_modules package-lock.json 2>/dev/null || true
+  npm ci --no-audit --no-fund || { echo "❌ Backend npm install все еще не удалось"; exit 1; }
 fi
 
+# ♻️ Перезапуск сервиса
 echo "♻️ Restarting backend service..."
-if systemctl is-active --quiet "$SERVICE_NAME"; then
-  sudo systemctl restart "$SERVICE_NAME"
-else
-  echo "⚠️ Backend service not active — trying to start it..."
-  sudo systemctl start "$SERVICE_NAME"
-fi
+sudo systemctl restart "$SERVICE_NAME" || echo "⚠️ Не удалось перезапустить сервис, проверь systemctl status"
 
-# --- 5️⃣ NGINX ---
+# 🌐 Проверка nginx
 echo "🌐 Reloading Nginx..."
-if ! sudo nginx -t; then
-  echo "❌ Nginx config error! Проверь /etc/nginx/sites-available/personal-portal"
-  exit 1
-fi
+sudo nginx -t && sudo systemctl reload nginx || echo "⚠️ Ошибка Nginx reload"
 
-sudo systemctl reload nginx
-
-# --- 6️⃣ HEALTH CHECK ---
-echo "🩺 Checking backend health..."
-sleep 2
+# 🩺 Health check
+echo "🩺 Checking API..."
 if curl -fs http://127.0.0.1:4000/api/ >/dev/null; then
-  echo "✅ Local backend is running"
+  echo "✅ Backend работает локально"
 else
-  echo "⚠️ Backend may not be responding locally"
+  echo "⚠️ Backend не отвечает локально"
 fi
 
 if curl -fs -k https://samoshechkin.ru/api/ >/dev/null; then
-  echo "✅ Public API reachable at https://samoshechkin.ru/api/"
+  echo "✅ API доступен публично"
 else
-  echo "⚠️ Public API unreachable! Проверь nginx proxy_pass или SSL-сертификаты."
+  echo "⚠️ API не доступен извне"
 fi
 
 echo "=== ✅ Deploy complete at $(date) ==="

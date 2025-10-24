@@ -10,11 +10,15 @@
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
+    "@grpc/grpc-js": "^1.11.1",
+    "@grpc/proto-loader": "^0.7.10",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3",
     "pg": "^8.11.3",
     "undici": "^6.19.8",
+    "uuid": "^9.0.1",
     "web-push": "^3.6.6"
   },
   "devDependencies": {
