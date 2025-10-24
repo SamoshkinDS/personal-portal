@@ -146,8 +146,10 @@ async function readConfigEmails(configPath = XRAY_CONFIG_PATH) {
 
 async function readKeyEmails() {
   const emails = new Set();
+  let rows = [];
   try {
-    const { rows } = await pool.query("SELECT name, comment FROM vless_keys");
+    const res = await pool.query("SELECT id, name, comment FROM vless_keys");
+    rows = res.rows || [];
     for (const row of rows) {
       const maybeName = String(row?.name || "").trim();
       const maybeComment = String(row?.comment || "").trim();
@@ -157,19 +159,35 @@ async function readKeyEmails() {
   } catch (error) {
     console.warn("[xray] Failed to read vless_keys for emails", error.message);
   }
-  return Array.from(emails);
+  return { emails: Array.from(emails), rows };
+}
+
+function keyMatchesEmail(row, email) {
+  const name = String(row?.name || "").trim().toLowerCase();
+  const comment = String(row?.comment || "").trim().toLowerCase();
+  const needle = String(email || "").trim().toLowerCase();
+  if (!needle) return false;
+  if (name === needle) return true;
+  if (!comment) return false;
+  if (comment === needle) return true;
+  return comment.includes(needle);
 }
 
 export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
   let targets = Array.isArray(emails) ? emails.slice() : null;
+  let keyRows = [];
   if (!targets || targets.length === 0) {
-    const [configEmails, keyEmails] = await Promise.all([readConfigEmails(), readKeyEmails()]);
+    const [configEmails, mappedKey] = await Promise.all([readConfigEmails(), readKeyEmails()]);
+    keyRows = mappedKey.rows || [];
     const merged = new Set();
-    for (const value of [...configEmails, ...keyEmails]) {
+    for (const value of [...configEmails, ...(mappedKey.emails || [])]) {
       const candidate = String(value || "").trim();
       if (candidate) merged.add(candidate);
     }
     targets = Array.from(merged);
+  } else {
+    const res = await pool.query("SELECT id, name, comment FROM vless_keys");
+    keyRows = res.rows || [];
   }
   if (targets.length === 0) {
     return [];
@@ -193,21 +211,24 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
           [email, stats.uplink, stats.downlink]
         );
       }
-      await pool.query(
-        `
-          UPDATE vless_keys
-          SET stats_json = jsonb_build_object(
-            'bytes_up', $2,
-            'bytes_down', $3,
-            'total', $4,
-            'synced_at', NOW()
-          )
-          WHERE TRIM(LOWER(name)) = TRIM(LOWER($1))
-             OR TRIM(LOWER(comment)) = TRIM(LOWER($1))
-             OR LOWER(comment) LIKE '%' || TRIM(LOWER($1)) || '%'
-        `,
-        [email, stats.uplink, stats.downlink, stats.total]
-      );
+      const matchingKeys = keyRows.filter((row) => keyMatchesEmail(row, email));
+      if (matchingKeys.length > 0) {
+        for (const key of matchingKeys) {
+          await pool.query(
+            `
+              UPDATE vless_keys
+              SET stats_json = jsonb_build_object(
+                'bytes_up', $2,
+                'bytes_down', $3,
+                'total', $4,
+                'synced_at', NOW()
+              )
+              WHERE id = $1
+            `,
+            [key.id, stats.uplink, stats.downlink, stats.total]
+          );
+        }
+      }
       results.push({ ...stats, persisted: changed });
     } catch (error) {
       console.error(`[xray] Failed to sync stats for ${email}`, error);
