@@ -237,20 +237,37 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
   for (const email of targets) {
     try {
       const stats = await getXrayUserTraffic(email);
-      const { rows } = await pool.query(
-        "SELECT uplink, downlink FROM vless_stats WHERE email = $1::text ORDER BY created_at DESC LIMIT 1",
-        [email]
-      );
+      let rows;
+      try {
+        const resSel = await pool.query(
+          "SELECT uplink, downlink FROM vless_stats WHERE email = $1::text ORDER BY created_at DESC LIMIT 1",
+          [email]
+        );
+        rows = resSel.rows;
+      } catch (e) {
+        console.error('[xray] SQLERR select_last_stats', { email }, e);
+        throw e;
+      }
       const last = rows[0];
       const changed =
         !last ||
         Math.abs(stats.uplink - Number(last.uplink || 0)) > thresholdBytes ||
         Math.abs(stats.downlink - Number(last.downlink || 0)) > thresholdBytes;
       if (changed) {
-        await pool.query(
-          "INSERT INTO vless_stats (email, uplink, downlink) VALUES ($1::text, $2::bigint, $3::bigint)",
-          [email, Number(stats.uplink || 0), Number(stats.downlink || 0)]
-        );
+        try {
+          await pool.query(
+            "INSERT INTO vless_stats (email, uplink, downlink) VALUES ($1::text, $2::bigint, $3::bigint)",
+            [email, Number(stats.uplink || 0), Number(stats.downlink || 0)]
+          );
+        } catch (e) {
+          console.error('[xray] SQLERR insert_stats', {
+            email,
+            u: Number(stats.uplink || 0),
+            d: Number(stats.downlink || 0),
+            types: [typeof email, typeof Number(stats.uplink || 0), typeof Number(stats.downlink || 0)],
+          }, e);
+          throw e;
+        }
       }
       const matchingKeys = keyRows.filter((row) => keyMatchesEmail(row, email));
       if (matchingKeys.length > 0) {
