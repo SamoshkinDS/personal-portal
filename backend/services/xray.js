@@ -255,16 +255,15 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
         Math.abs(stats.downlink - Number(last.downlink || 0)) > thresholdBytes;
       if (changed) {
         try {
-          await pool.query(
-            "INSERT INTO vless_stats (email, uplink, downlink) VALUES ($1::text, $2::bigint, $3::bigint)",
-            [email, Number(stats.uplink || 0), Number(stats.downlink || 0)]
-          );
+          const uVal = Math.max(0, Math.floor(Number(stats.uplink || 0)));
+          const dVal = Math.max(0, Math.floor(Number(stats.downlink || 0)));
+          const sql = `INSERT INTO vless_stats (email, uplink, downlink) VALUES ($1::text, ${uVal}::bigint, ${dVal}::bigint)`;
+          await pool.query(sql, [email]);
         } catch (e) {
-          console.error('[xray] SQLERR insert_stats', {
+          console.error('[xray] SQLERR insert_stats_literal', {
             email,
-            u: Number(stats.uplink || 0),
-            d: Number(stats.downlink || 0),
-            types: [typeof email, typeof Number(stats.uplink || 0), typeof Number(stats.downlink || 0)],
+            uplink: stats.uplink,
+            downlink: stats.downlink,
           }, e);
           throw e;
         }
