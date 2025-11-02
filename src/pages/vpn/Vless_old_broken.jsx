@@ -40,14 +40,6 @@ function toGB(value) {
   return Number.isFinite(value) ? value / GB : 0;
 }
 
-function maskUuid(uuid) {
-  const raw = String(uuid || "").replace(/-/g, "");
-  if (raw.length < 8) return raw || "-";
-  const head = raw.slice(0, 4);
-  const tail = raw.slice(-4);
-  return `${head}****${tail}`;
-}
-
 function StatsTooltip({ active, payload, label }) {
   if (!active || !payload || payload.length === 0) return null;
   return (
@@ -80,7 +72,7 @@ export default function Vless() {
   const [copyHint, setCopyHint] = React.useState(null);
 
   const [stats, setStats] = React.useState(null);
-  const [statsLabel, setStatsLabel] = React.useState("Все ключи VLESS");
+  const [statsLabel, setStatsLabel] = React.useState("All VLESS keys");
   const [statsLoading, setStatsLoading] = React.useState(false);
   const [statsError, setStatsError] = React.useState(null);
 
@@ -111,16 +103,16 @@ export default function Vless() {
       const info = payload?.stats || null;
       if (info) {
         setStats(info);
-        const label = info.label || info.tag || "Все ключи VLESS";
+        const label = info.label || info.tag || "All VLESS keys";
         setStatsLabel(label);
       } else {
         setStats(null);
-        setStatsLabel("Все ключи VLESS");
+        setStatsLabel("All VLESS keys");
       }
       setLastUpdated(new Date());
     } catch (err) {
       setStats(null);
-      setStatsLabel("Все ключи VLESS");
+      setStatsLabel("All VLESS keys");
       setStatsError(err?.message || "Failed to load stats");
     } finally {
       setStatsLoading(false);
@@ -189,6 +181,7 @@ export default function Vless() {
         const message = payload?.error || payload?.message || `Failed to sync stats (${res.status})`;
         throw new Error(message);
       }
+      // �������� aggregate stats, history and keys list so per-key Traffic updates immediately
       await fetchStats();
       await fetchHistory(historyRange);
       await reload();
@@ -201,7 +194,10 @@ export default function Vless() {
 
   const handleCreateSubmit = async (event) => {
     event.preventDefault();
-    const payload = { name: newName.trim(), comment: newComment.trim() };
+    const payload = {
+      name: newName.trim(),
+      comment: newComment.trim(),
+    };
     if (!payload.name) return;
     const ok = await createKey(payload);
     if (ok) {
@@ -226,7 +222,10 @@ export default function Vless() {
   const handleEditSubmit = async (event) => {
     event.preventDefault();
     if (!editingId) return;
-    const payload = { name: editingName.trim(), comment: editingComment.trim() };
+    const payload = {
+      name: editingName.trim(),
+      comment: editingComment.trim(),
+    };
     const ok = await updateKey(editingId, payload);
     if (ok) {
       cancelEditing();
@@ -234,7 +233,7 @@ export default function Vless() {
   };
 
   const handleDelete = async (key) => {
-    if (!window.confirm(`Удалить ключ "${key.name || key.uuid}"?`)) return;
+    if (!window.confirm(`Delete key "${key.name || key.uuid}"?`)) return;
     await deleteKey(key.id);
   };
 
@@ -242,10 +241,10 @@ export default function Vless() {
     if (!key?.config_url) return;
     try {
       await navigator.clipboard.writeText(key.config_url);
-      setCopyHint(`Строка подключения скопирована (${key.name || maskUuid(key.uuid)})`);
+      setCopyHint(`Connection string copied (${key.name || key.uuid})`);
     } catch (err) {
       console.error("Clipboard write failed", err);
-      setCopyHint("Буфер обмена недоступен");
+      setCopyHint("Clipboard is not available");
     }
   };
 
@@ -280,6 +279,7 @@ export default function Vless() {
             to="/vpn/vless/guide"
             className="inline-flex items-center gap-2 self-start rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
           >
+            <span aria-hidden="true">📘</span>
             Инструкция
           </Link>
         </div>
@@ -296,14 +296,20 @@ export default function Vless() {
                   {statsError}
                 </div>
               )}
-              <div className="grid gap-3 text-gray-700 dark:text-gray-300">
+              <div className="grid gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <div className="text-sm text-gray-500 dark:text-gray-400">{statsLabel}</div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">Итого: {totalGB.toFixed(2)} GB</div>
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200">↑ Отправлено: {uplinkMB.toFixed(2)} MB</span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">↓ Получено: {downlinkMB.toFixed(2)} MB</span>
+                <div>
+                  <span className="font-semibold">Отправлено:</span> {uplinkMB.toFixed(2)} MB
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Обновлено: {statsLoading ? "Загрузка…" : lastUpdated ? lastUpdated.toLocaleString() : "-"}</div>
+                <div>
+                  <span className="font-semibold">Получено:</span> {downlinkMB.toFixed(2)} MB
+                </div>
+                <div>
+                  <span className="font-semibold">Итого:</span> {totalGB.toFixed(2)} GB
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  Last updated: {statsLoading ? "Loading…" : lastUpdated ? lastUpdated.toLocaleString() : "—"}
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -312,6 +318,7 @@ export default function Vless() {
                   disabled={syncing}
                   className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                 >
+                  <span aria-hidden="true">⟳</span>
                   {syncing ? "Обновляю…" : "Обновить статистику"}
                 </button>
                 <button
@@ -347,7 +354,9 @@ export default function Vless() {
                     type="button"
                     onClick={() => handleRangeChange(30)}
                     className={`rounded-full px-3 py-1 transition ${
-                      historyRange === 30 ? "bg-gray-200 dark:bg-gray-700" : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                      historyRange === 30
+                        ? "bg-gray-200 dark:bg-gray-700"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-800"
                     }`}
                   >
                     30 дней
@@ -357,7 +366,9 @@ export default function Vless() {
             </div>
             <div className="h-64 w-full max-w-xl">
               {historyLoading ? (
-                <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">Загрузка истории…</div>
+                <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                  Loading history…
+                </div>
               ) : chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
@@ -380,7 +391,9 @@ export default function Vless() {
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">История пока пуста.</div>
+                <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                  История пока пуста.
+                </div>
               )}
             </div>
           </div>
@@ -395,70 +408,117 @@ export default function Vless() {
               onClick={() => setIsCreating((prev) => !prev)}
               className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
             >
-              Новый ключ
+              <span aria-hidden="true">＋</span>
+              ����� ����
             </button>
             <button
               type="button"
               onClick={reload}
               className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
             >
-              Обновить
+              <span aria-hidden="true">⟳</span>
+              ��������
             </button>
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">{loading ? "Загрузка ключей…" : `${keys.length} ключ(ей)`}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {loading ? "Loading keys..." : `${keys.length} keys`}
+          </div>
         </div>
 
         {isCreating && (
-          <form onSubmit={handleCreateSubmit} className="mt-4 grid gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+          <form
+            onSubmit={handleCreateSubmit}
+            className="mt-4 grid gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10"
+          >
             <div className="grid gap-1">
               <label className="text-xs font-medium uppercase text-indigo-700 dark:text-indigo-200" htmlFor="vless-name">
-                Имя
+                Name
               </label>
               <input
                 id="vless-name"
                 value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-indigo-500/30 dark:bg-slate-900 dark:text-gray-100"
+                onChange={(event) => setNewName(event.target.value)}
+                placeholder="Device name"
+                className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-indigo-500/20 dark:bg-slate-900 dark:text-gray-100"
+                required
               />
             </div>
             <div className="grid gap-1">
               <label className="text-xs font-medium uppercase text-indigo-700 dark:text-indigo-200" htmlFor="vless-comment">
-                Комментарий (необязательно)
+                Comment
               </label>
               <input
                 id="vless-comment"
                 value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-indigo-500/30 dark:bg-slate-900 dark:text-gray-100"
+                onChange={(event) => setNewComment(event.target.value)}
+                placeholder="Optional description"
+                className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-indigo-500/20 dark:bg-slate-900 dark:text-gray-100"
               />
             </div>
-            <div className="flex justify-end gap-2">
-              <button type="submit" className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700">
-                Создать
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
+              >
+                Create key
               </button>
-              <button type="button" onClick={() => setIsCreating(false)} className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800">
-                Отмена
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreating(false);
+                  setNewName("");
+                  setNewComment("");
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
+              >
+                Cancel
               </button>
             </div>
           </form>
         )}
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50/60 dark:bg-slate-900/50">
+        {error && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
+            {error}
+          </div>
+        )}
+
+        {copyHint && (
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+            {copyHint}
+          </div>
+        )}
+
+        <div className="mt-6 overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
+            <thead className="bg-gray-50/80 dark:bg-slate-900/60">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Name</th>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">UUID</th>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Comment</th>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Traffic</th>
-                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Created</th>
-                <th scope="col" className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-200">Actions</th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  Name
+                </th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  UUID
+                </th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  Comment
+                </th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  Traffic
+                </th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+                  Created
+                </th>
+                <th scope="col" className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-200">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white/60 dark:divide-gray-700 dark:bg-slate-900/40">
               {keys.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">Пока нет ключей.</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No keys yet.
+                  </td>
                 </tr>
               ) : (
                 keys.map((key) => {
@@ -482,8 +542,8 @@ export default function Vless() {
                       </td>
                       <td className="px-4 py-3 align-top">
                         <div className="flex flex-col gap-1">
-                          <code className="rounded-lg bg-slate-900/90 px-2 py-1 text-xs text-emerald-200 dark:bg-slate-800">
-                            {maskUuid(key.uuid)}
+                          <code className="break-all rounded-lg bg-slate-900/90 px-2 py-1 text-xs text-emerald-200 dark:bg-slate-800">
+                            {key.uuid}
                           </code>
                           {key.config_url && (
                             <button
@@ -511,11 +571,15 @@ export default function Vless() {
                       <td className="px-4 py-3 align-top text-sm text-gray-600 dark:text-gray-400">
                         <div className="flex flex-col gap-1">
                           <div className="inline-flex items-center gap-2 text-xs">
-                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">Отправлено</span>
+                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+                              Up
+                            </span>
                             <span>{bytesUp}</span>
                           </div>
                           <div className="inline-flex items-center gap-2 text-xs">
-                            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700 dark:bg-sky-500/10 dark:text-sky-200">Получено</span>
+                            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700 dark:bg-sky-500/10 dark:text-sky-200">
+                              Down
+                            </span>
                             <span>{bytesDown}</span>
                           </div>
                           <div className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
@@ -524,17 +588,42 @@ export default function Vless() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-top text-sm text-gray-600 dark:text-gray-400">{formatDate(key.created_at)}</td>
+                      <td className="px-4 py-3 align-top text-sm text-gray-600 dark:text-gray-400">
+                        {formatDate(key.created_at)}
+                      </td>
                       <td className="px-4 py-3 align-top">
                         {isEditing ? (
                           <form onSubmit={handleEditSubmit} className="flex flex-wrap justify-end gap-2">
-                            <button type="submit" className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700">Сохранить</button>
-                            <button type="button" onClick={cancelEditing} className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800">Отмена</button>
+                            <button
+                              type="submit"
+                              className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                            >
+                              Сохранить
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditing}
+                              className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
+                            >
+                              Отмена
+                            </button>
                           </form>
                         ) : (
                           <div className="flex justify-end gap-2">
-                            <button type="button" onClick={() => startEditing(key)} className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800">Редактировать</button>
-                            <button type="button" onClick={() => handleDelete(key)} className="inline-flex items-center gap-1 rounded-full border border-red-300 px-3 py-1 text-xs font-medium text-red-600 transition hover:border-red-400 hover:bg-red-50 dark:border-red-500/50 dark:text-red-300 dark:hover:border-red-400/70 dark:hover:bg-red-500/10">Удалить</button>
+                            <button
+                              type="button"
+                              onClick={() => startEditing(key)}
+                              className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
+                            >
+                              Редактировать
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(key)}
+                              className="inline-flex items-center gap-1 rounded-full border border-red-300 px-3 py-1 text-xs font-medium text-red-600 transition hover:border-red-400 hover:bg-red-50 dark:border-red-500/50 dark:text-red-300 dark:hover:border-red-400/70 dark:hover:bg-red-500/10"
+                            >
+                              Удалить
+                            </button>
                           </div>
                         )}
                       </td>
