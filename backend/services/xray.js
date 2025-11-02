@@ -204,21 +204,20 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
       const uplink = Number(row.uplink || 0);
       const downlink = Number(row.downlink || 0);
       const total = Number(row.total || uplink + downlink);
-      const payload = {
-        bytes_up: uplink,
-        bytes_down: downlink,
-        total,
-        synced_at: new Date().toISOString(),
-      };
       await pool.query(
         `
         UPDATE vless_keys
-        SET stats_json = $2::jsonb
+        SET stats_json = jsonb_build_object(
+          'bytes_up', $2::bigint,
+          'bytes_down', $3::bigint,
+          'total', $4::bigint,
+          'synced_at', NOW()
+        )
         WHERE TRIM(LOWER(name)) = TRIM(LOWER($1::text))
-           OR TRIM(LOWER(comment)) = TRIM(LOWER($1::text))
-           OR LOWER(comment) LIKE '%' || TRIM(LOWER($1::text)) || '%'
+           OR TRIM(LOWER(COALESCE(comment,''))) = TRIM(LOWER($1::text))
+           OR LOWER(COALESCE(comment,'')) LIKE '%' || TRIM(LOWER($1::text)) || '%'
       `,
-        [email, JSON.stringify(payload)]
+        [email, uplink, downlink, total]
       );
       results.push({ email, uplink, downlink, total, persisted: false });
     }
@@ -250,19 +249,23 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
       const matchingKeys = keyRows.filter((row) => keyMatchesEmail(row, email));
       if (matchingKeys.length > 0) {
         for (const key of matchingKeys) {
-          const payload = {
-            bytes_up: Number(stats.uplink || 0),
-            bytes_down: Number(stats.downlink || 0),
-            total: Number(stats.total || 0),
-            synced_at: new Date().toISOString(),
-          };
           await pool.query(
             `
               UPDATE vless_keys
-              SET stats_json = $2::jsonb
+              SET stats_json = jsonb_build_object(
+                'bytes_up', $2::bigint,
+                'bytes_down', $3::bigint,
+                'total', $4::bigint,
+                'synced_at', NOW()
+              )
               WHERE id = $1::int
             `,
-            [key.id, JSON.stringify(payload)]
+            [
+              key.id,
+              Number(stats.uplink || 0),
+              Number(stats.downlink || 0),
+              Number(stats.total || 0),
+            ]
           );
         }
       }
@@ -315,7 +318,7 @@ export async function getVlessHistory(emailParam, days) {
     `
       SELECT id, email, uplink, downlink, total, created_at
       FROM vless_stats
-      WHERE email = $1
+      WHERE email = $1::text
         AND created_at >= NOW() - ($2::int) * INTERVAL '1 day'
       ORDER BY created_at ASC
     `,
