@@ -214,9 +214,9 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
         `
         UPDATE vless_keys
         SET stats_json = $2::jsonb
-        WHERE TRIM(LOWER(name)) = TRIM(LOWER($1))
-           OR TRIM(LOWER(comment)) = TRIM(LOWER($1))
-           OR LOWER(comment) LIKE '%' || TRIM(LOWER($1)) || '%'
+        WHERE TRIM(LOWER(name)) = TRIM(LOWER($1::text))
+           OR TRIM(LOWER(comment)) = TRIM(LOWER($1::text))
+           OR LOWER(comment) LIKE '%' || TRIM(LOWER($1::text)) || '%'
       `,
         [email, JSON.stringify(payload)]
       );
@@ -260,7 +260,7 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
             `
               UPDATE vless_keys
               SET stats_json = $2::jsonb
-              WHERE id = $1
+              WHERE id = $1::int
             `,
             [key.id, JSON.stringify(payload)]
           );
@@ -291,7 +291,7 @@ export async function getVlessHistory(emailParam, days) {
           SUM(total) AS total,
           created_at
         FROM vless_stats
-        WHERE created_at >= NOW() - ($1 || ' days')::interval
+        WHERE created_at >= NOW() - ($1::int) * INTERVAL '1 day'
         GROUP BY created_at
         ORDER BY created_at ASC
       `,
@@ -316,7 +316,7 @@ export async function getVlessHistory(emailParam, days) {
       SELECT id, email, uplink, downlink, total, created_at
       FROM vless_stats
       WHERE email = $1
-        AND created_at >= NOW() - ($2 || ' days')::interval
+        AND created_at >= NOW() - ($2::int) * INTERVAL '1 day'
       ORDER BY created_at ASC
     `,
     [email, String(range)]

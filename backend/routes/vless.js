@@ -36,7 +36,7 @@ async function hydrateKey(row) {
     if (fetched && typeof fetched === "object" && !Array.isArray(fetched)) {
       updatedStats = fetched;
       if (JSON.stringify(fetched) !== JSON.stringify(stats)) {
-        await pool.query("UPDATE vless_keys SET stats_json = $1 WHERE id = $2", [fetched, row.id]);
+        await pool.query("UPDATE vless_keys SET stats_json = $1::jsonb WHERE id = $2::int", [JSON.stringify(fetched), row.id]);
       }
     }
   } catch (err) {
