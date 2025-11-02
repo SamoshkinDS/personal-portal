@@ -9,6 +9,7 @@ import todosRoutes from "./routes/todos.js";
 import postsRoutes from "./routes/posts.js";
 import vpnRoutes from "./routes/vpn.js";
 import vlessRoutes from "./routes/vless.js";
+import xrayRoutes from "./routes/xray.js";
 import notificationsRoutes from "./routes/notifications.js";
 import { pool } from "./db/connect.js";
 import { syncVlessStats } from "./services/xray.js";
@@ -31,6 +32,7 @@ app.use("/api/todos", todosRoutes);
 app.use("/api/posts", postsRoutes);
 app.use("/api/vpn", vpnRoutes);
 app.use("/api/vless", vlessRoutes);
+app.use("/api/xray", xrayRoutes);
 app.use("/api/notifications", notificationsRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";

@@ -1,6 +1,7 @@
 // encoding: utf-8
 import React from "react";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import PageShell from "../../components/PageShell.jsx";
 import useVlessKeys from "../../hooks/useVlessKeys.js";
@@ -180,7 +181,7 @@ export default function Vless() {
         const message = payload?.error || payload?.message || `Failed to sync stats (${res.status})`;
         throw new Error(message);
       }
-      // Refresh aggregate stats, history and keys list so per-key Traffic updates immediately
+      // �������� aggregate stats, history and keys list so per-key Traffic updates immediately
       await fetchStats();
       await fetchHistory(historyRange);
       await reload();
@@ -255,14 +256,7 @@ export default function Vless() {
     () =>
       history.map((entry) => {
         const date = entry.created_at ? new Date(entry.created_at) : null;
-        const label = date
-          ? date.toLocaleString("ru-RU", {
-              day: "2-digit",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "";
+        const label = date ? date.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" }) : "";
         return {
           label,
           uplinkMB: toMB(entry.uplink),
@@ -278,17 +272,15 @@ export default function Vless() {
       <section className="rounded-3xl bg-white/80 p-6 shadow-sm transition-colors duration-500 dark:bg-slate-900/70">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">VLESS keys management</h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Create, rename, and remove personal VLESS keys. Each entry exposes a ready-to-use connection URL.
-            </p>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Управление ключами VLESS</h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Создавайте, переименовывайте и удаляйте личные ключи VLESS. Для каждого доступна ссылка подключения.</p>
           </div>
           <Link
             to="/vpn/vless/guide"
             className="inline-flex items-center gap-2 self-start rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
           >
             <span aria-hidden="true">📘</span>
-            Setup guide
+            Инструкция
           </Link>
         </div>
       </section>
@@ -297,27 +289,23 @@ export default function Vless() {
         <section className="rounded-3xl bg-white/80 p-6 shadow-sm transition-colors duration-500 dark:bg-slate-900/70">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="space-y-3">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">VLESS traffic</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Aggregate uplink/downlink counters fetched from the Xray gRPC API for all keys.
-              </p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Трафик VLESS</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Суммарные счётчики по всем ключам (из Xray gRPC).</p>
               {statsError && (
                 <div className="rounded-2xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
                   {statsError}
                 </div>
               )}
               <div className="grid gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <div className="text-sm text-gray-500 dark:text-gray-400">{statsLabel}</div>
                 <div>
-                  <span className="font-semibold">Scope:</span> {statsLabel}
+                  <span className="font-semibold">Отправлено:</span> {uplinkMB.toFixed(2)} MB
                 </div>
                 <div>
-                  <span className="font-semibold">Uplink:</span> {uplinkMB.toFixed(2)} MB
+                  <span className="font-semibold">Получено:</span> {downlinkMB.toFixed(2)} MB
                 </div>
                 <div>
-                  <span className="font-semibold">Downlink:</span> {downlinkMB.toFixed(2)} MB
-                </div>
-                <div>
-                  <span className="font-semibold">Total:</span> {totalGB.toFixed(2)} GB
+                  <span className="font-semibold">Итого:</span> {totalGB.toFixed(2)} GB
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
                   Last updated: {statsLoading ? "Loading…" : lastUpdated ? lastUpdated.toLocaleString() : "—"}
@@ -331,7 +319,26 @@ export default function Vless() {
                   className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span aria-hidden="true">⟳</span>
-                  {syncing ? "Syncing..." : "Sync now"}
+                  {syncing ? "Обновляю…" : "Обновить статистику"}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await apiAuthFetch("/api/xray/sync", { method: "POST" });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${res.status}`);
+                      toast.success("Xray обновлён");
+                      await fetchStats();
+                      await fetchHistory(historyRange);
+                      await reload();
+                    } catch (e) {
+                      toast.error("Ошибка при обновлении Xray");
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
+                >
+                  🔄 Синхронизировать Xray
                 </button>
                 <div className="inline-flex items-center gap-2 rounded-full border border-gray-300 p-1 text-xs font-medium text-gray-600 dark:border-gray-600 dark:text-gray-200">
                   <button
@@ -341,7 +348,7 @@ export default function Vless() {
                       historyRange === 7 ? "bg-gray-200 dark:bg-gray-700" : "hover:bg-gray-100 dark:hover:bg-gray-800"
                     }`}
                   >
-                    7 days
+                    7 дней
                   </button>
                   <button
                     type="button"
@@ -352,7 +359,7 @@ export default function Vless() {
                         : "hover:bg-gray-100 dark:hover:bg-gray-800"
                     }`}
                   >
-                    30 days
+                    30 дней
                   </button>
                 </div>
               </div>
@@ -379,13 +386,13 @@ export default function Vless() {
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={Math.max(Math.floor(chartData.length / 6), 0)} />
                     <YAxis tick={{ fontSize: 11 }} width={50} />
                     <Tooltip content={<StatsTooltip />} />
-                    <Area type="monotone" dataKey="uplinkMB" name="Uplink" stroke="#6366f1" fill="url(#uplink)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="downlinkMB" name="Downlink" stroke="#22c55e" fill="url(#downlink)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="uplinkMB" name="Отправлено" stroke="#6366f1" fill="url(#uplink)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="downlinkMB" name="Получено" stroke="#22c55e" fill="url(#downlink)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-                  No history captured yet.
+                  История пока пуста.
                 </div>
               )}
             </div>
@@ -402,7 +409,7 @@ export default function Vless() {
               className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
             >
               <span aria-hidden="true">＋</span>
-              New key
+              ����� ����
             </button>
             <button
               type="button"
@@ -410,7 +417,7 @@ export default function Vless() {
               className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
             >
               <span aria-hidden="true">⟳</span>
-              Refresh
+              ��������
             </button>
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -544,7 +551,7 @@ export default function Vless() {
                               onClick={() => handleCopy(key)}
                               className="inline-flex items-center gap-1 self-start rounded-full border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-500/40 dark:text-emerald-200 dark:hover:border-emerald-400/50 dark:hover:bg-emerald-500/10"
                             >
-                              Copy link
+                              Скопировать ссылку
                             </button>
                           )}
                         </div>
@@ -576,7 +583,7 @@ export default function Vless() {
                             <span>{bytesDown}</span>
                           </div>
                           <div className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
-                            <span>Total</span>
+                            <span>Итого</span>
                             <span>{bytesTotal}</span>
                           </div>
                         </div>
@@ -591,14 +598,14 @@ export default function Vless() {
                               type="submit"
                               className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700"
                             >
-                              Save
+                              Сохранить
                             </button>
                             <button
                               type="button"
                               onClick={cancelEditing}
                               className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
                             >
-                              Cancel
+                              Отмена
                             </button>
                           </form>
                         ) : (
@@ -608,14 +615,14 @@ export default function Vless() {
                               onClick={() => startEditing(key)}
                               className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-slate-800"
                             >
-                              Edit
+                              Редактировать
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(key)}
                               className="inline-flex items-center gap-1 rounded-full border border-red-300 px-3 py-1 text-xs font-medium text-red-600 transition hover:border-red-400 hover:bg-red-50 dark:border-red-500/50 dark:text-red-300 dark:hover:border-red-400/70 dark:hover:bg-red-500/10"
                             >
-                              Delete
+                              Удалить
                             </button>
                           </div>
                         )}
@@ -631,3 +638,4 @@ export default function Vless() {
     </PageShell>
   );
 }
+
