@@ -204,18 +204,22 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
       const uplink = Number(row.uplink || 0);
       const downlink = Number(row.downlink || 0);
       const total = Number(row.total || uplink + downlink);
-      await pool.query(`
+      const payload = {
+        bytes_up: uplink,
+        bytes_down: downlink,
+        total,
+        synced_at: new Date().toISOString(),
+      };
+      await pool.query(
+        `
         UPDATE vless_keys
-        SET stats_json = jsonb_build_object(
-          'bytes_up', $2::bigint,
-          'bytes_down', $3::bigint,
-          'total', $4::bigint,
-          'synced_at', NOW()
-        )
+        SET stats_json = $2::jsonb
         WHERE TRIM(LOWER(name)) = TRIM(LOWER($1))
            OR TRIM(LOWER(comment)) = TRIM(LOWER($1))
            OR LOWER(comment) LIKE '%' || TRIM(LOWER($1)) || '%'
-      `, [email, uplink, downlink, total]);
+      `,
+        [email, JSON.stringify(payload)]
+      );
       results.push({ email, uplink, downlink, total, persisted: false });
     }
     return results;
@@ -239,25 +243,26 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
         Math.abs(stats.downlink - Number(last.downlink || 0)) > thresholdBytes;
       if (changed) {
         await pool.query(
-          "INSERT INTO vless_stats (email, uplink, downlink) VALUES ($1, $2, $3)",
-          [email, stats.uplink, stats.downlink]
+          "INSERT INTO vless_stats (email, uplink, downlink) VALUES ($1::text, $2::bigint, $3::bigint)",
+          [email, Number(stats.uplink || 0), Number(stats.downlink || 0)]
         );
       }
       const matchingKeys = keyRows.filter((row) => keyMatchesEmail(row, email));
       if (matchingKeys.length > 0) {
         for (const key of matchingKeys) {
+          const payload = {
+            bytes_up: Number(stats.uplink || 0),
+            bytes_down: Number(stats.downlink || 0),
+            total: Number(stats.total || 0),
+            synced_at: new Date().toISOString(),
+          };
           await pool.query(
             `
               UPDATE vless_keys
-              SET stats_json = jsonb_build_object(
-                'bytes_up', $2::bigint,
-                'bytes_down', $3::bigint,
-                'total', $4::bigint,
-                'synced_at', NOW()
-              )
+              SET stats_json = $2::jsonb
               WHERE id = $1
             `,
-            [key.id, stats.uplink, stats.downlink, stats.total]
+            [key.id, JSON.stringify(payload)]
           );
         }
       }
@@ -341,6 +346,7 @@ export async function getStatsByUUID(uuid) {
 }
 
 export const MB_BYTES = ONE_MB;
+
 
 
 
