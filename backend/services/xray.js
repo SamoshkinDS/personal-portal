@@ -210,7 +210,8 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
         total,
         synced_at: new Date().toISOString(),
       };
-      await pool.query(
+      try {
+        await pool.query(
         `
         UPDATE vless_keys
         SET stats_json = $2::jsonb
@@ -218,8 +219,12 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
            OR TRIM(LOWER(COALESCE(comment,''))) = TRIM(LOWER($1::text))
            OR LOWER(COALESCE(comment,'')) LIKE '%' || TRIM(LOWER($1::text)) || '%'
       `,
-        [email, JSON.stringify(payload)]
-      );
+          [email, JSON.stringify(payload)]
+        );
+      } catch (e) {
+        console.error('[xray] SQLERR fallback_update_keys', { email, payloadKeys: Object.keys(payload) }, e);
+        throw e;
+      }
       results.push({ email, uplink, downlink, total, persisted: false });
     }
     return results;
@@ -256,14 +261,19 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
             total: Number(stats.total || 0),
             synced_at: new Date().toISOString(),
           };
-          await pool.query(
+          try {
+            await pool.query(
             `
               UPDATE vless_keys
               SET stats_json = $2::jsonb
               WHERE id = $1::int
             `,
-            [key.id, JSON.stringify(payload)]
-          );
+              [key.id, JSON.stringify(payload)]
+            );
+          } catch (e) {
+            console.error('[xray] SQLERR update_key_by_id', { id: key.id, payloadKeys: Object.keys(payload) }, e);
+            throw e;
+          }
         }
       }
       results.push({ ...stats, persisted: changed });
