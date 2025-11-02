@@ -207,9 +207,9 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
       await pool.query(`
         UPDATE vless_keys
         SET stats_json = jsonb_build_object(
-          'bytes_up', $2,
-          'bytes_down', $3,
-          'total', $4,
+          'bytes_up', $2::bigint,
+          'bytes_down', $3::bigint,
+          'total', $4::bigint,
           'synced_at', NOW()
         )
         WHERE TRIM(LOWER(name)) = TRIM(LOWER($1))
@@ -250,9 +250,9 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
             `
               UPDATE vless_keys
               SET stats_json = jsonb_build_object(
-                'bytes_up', $2,
-                'bytes_down', $3,
-                'total', $4,
+                'bytes_up', $2::bigint,
+                'bytes_down', $3::bigint,
+                'total', $4::bigint,
                 'synced_at', NOW()
               )
               WHERE id = $1
@@ -341,4 +341,6 @@ export async function getStatsByUUID(uuid) {
 }
 
 export const MB_BYTES = ONE_MB;
+
+
 
