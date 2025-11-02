@@ -233,7 +233,7 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
     try {
       const stats = await getXrayUserTraffic(email);
       const { rows } = await pool.query(
-        "SELECT uplink, downlink FROM vless_stats WHERE email = $1 ORDER BY created_at DESC LIMIT 1",
+        "SELECT uplink, downlink FROM vless_stats WHERE email = $1::text ORDER BY created_at DESC LIMIT 1",
         [email]
       );
       const last = rows[0];
