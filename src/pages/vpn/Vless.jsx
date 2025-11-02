@@ -180,8 +180,10 @@ export default function Vless() {
         const message = payload?.error || payload?.message || `Failed to sync stats (${res.status})`;
         throw new Error(message);
       }
+      // Refresh aggregate stats, history and keys list so per-key Traffic updates immediately
       await fetchStats();
       await fetchHistory(historyRange);
+      await reload();
     } catch (err) {
       setStatsError(err?.message || "Failed to update stats");
     } finally {

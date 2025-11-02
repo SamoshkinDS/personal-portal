@@ -4,6 +4,10 @@ import { apiAuthFetch } from "../utils/api.js";
 
 function normaliseKey(raw) {
   if (!raw) return null;
+  let stats = raw.stats_json || {};
+  if (typeof stats === "string") {
+    try { stats = JSON.parse(stats); } catch { stats = {}; }
+  }
   return {
     id: raw.id,
     uuid: raw.uuid,
@@ -11,7 +15,7 @@ function normaliseKey(raw) {
     comment: raw.comment || "",
     created_at: raw.created_at,
     config_url: raw.config_url || "",
-    stats_json: raw.stats_json || {},
+    stats_json: stats,
   };
 }
 
