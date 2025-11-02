@@ -304,28 +304,28 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
 }
 
 export async function getVlessHistory(emailParam, days) {
-  const range = Number(days) === 30 ? 30 : 7;
+  const requested = Number(days);
+  const range = requested === 30 ? 30 : 7;
+  const safeDays = Math.max(1, Math.min(90, Number(range) || 7));
   const raw = String(emailParam || "").trim();
   if (!raw || raw.toLowerCase() === "aggregate" || raw.toLowerCase() === "default") {
-    const { rows } = await pool.query(
-      `
-        SELECT
-          MIN(id) AS id,
-          NULL::text AS email,
-          SUM(uplink) AS uplink,
-          SUM(downlink) AS downlink,
-          SUM(total) AS total,
-          created_at
-        FROM vless_stats
-        WHERE created_at >= NOW() - ($1::int) * INTERVAL '1 day'
-        GROUP BY created_at
-        ORDER BY created_at ASC
-      `,
-      [String(range)]
-    );
+    const sqlAgg = `
+      SELECT
+        MIN(id) AS id,
+        NULL::text AS email,
+        SUM(uplink) AS uplink,
+        SUM(downlink) AS downlink,
+        SUM(total) AS total,
+        created_at
+      FROM vless_stats
+      WHERE created_at >= NOW() - ${safeDays} * INTERVAL '1 day'
+      GROUP BY created_at
+      ORDER BY created_at ASC
+    `;
+    const { rows } = await pool.query(sqlAgg);
     return {
       email: null,
-      range,
+      range: safeDays,
       history: rows.map((row) => ({
         id: row.id,
         email: row.email,
@@ -337,24 +337,26 @@ export async function getVlessHistory(emailParam, days) {
     };
   }
   const email = raw;
-  const { rows } = await pool.query(
-    `
-      SELECT id, email, uplink, downlink, total, created_at
-      FROM vless_stats
-      WHERE email = $1::text
-        AND created_at >= NOW() - ($2::int) * INTERVAL '1 day'
-      ORDER BY created_at ASC
-    `,
-    [email, String(range)]
-  );
-  return { email, range, history: rows.map((row) => ({
-    id: row.id,
-    email: row.email,
-    uplink: Number(row.uplink || 0),
-    downlink: Number(row.downlink || 0),
-    total: Number(row.total || 0),
-    created_at: row.created_at,
-  })) };
+  const sql = `
+    SELECT id, email, uplink, downlink, total, created_at
+    FROM vless_stats
+    WHERE email = $1::text
+      AND created_at >= NOW() - ${safeDays} * INTERVAL '1 day'
+    ORDER BY created_at ASC
+  `;
+  const { rows } = await pool.query(sql, [email]);
+  return {
+    email,
+    range: safeDays,
+    history: rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      uplink: Number(row.uplink || 0),
+      downlink: Number(row.downlink || 0),
+      total: Number(row.total || 0),
+      created_at: row.created_at,
+    })),
+  };
 }
 
 export function getDefaultVlessEmail() {
