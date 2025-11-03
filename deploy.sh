@@ -54,11 +54,24 @@ fi
 
 # ♻️ Перезапуск сервиса
 echo "♻️ Restarting backend service..."
-sudo systemctl restart "$SERVICE_NAME" || echo "⚠️ Не удалось перезапустить сервис, проверь systemctl status"
+if sudo systemctl restart "$SERVICE_NAME"; then
+  echo "✅ Сервис $SERVICE_NAME успешно перезапущен"
+else
+  echo "⚠️ Не удалось перезапустить сервис, проверь systemctl status"
+fi
+
+
 
 # 🌐 Проверка nginx
 echo "🌐 Reloading Nginx..."
-sudo nginx -t && sudo systemctl reload nginx || echo "⚠️ Ошибка Nginx reload"
+if sudo nginx -t; then
+  sudo systemctl reload nginx
+  echo "✅ Nginx успешно перезагружен"
+else
+  echo "⚠️ Ошибка проверки nginx.conf"
+fi
+
+
 
 # 🩺 Health check
 echo "🩺 Checking API..."
