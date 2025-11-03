@@ -1,3 +1,6 @@
+name: Управление ключами VLESS
+description: Генерация, выдача и ротация ключей доступа для VPN.
+
 ## VLESS Keys & Xray Stats
 
 **Purpose:** provide a unified flow for provisioning VLESS keys, exposing metrics from Xray gRPC, and surfacing historical traffic charts inside the VPN dashboard.

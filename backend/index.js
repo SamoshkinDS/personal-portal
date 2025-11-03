@@ -11,6 +11,7 @@ import vpnRoutes from "./routes/vpn.js";
 import vlessRoutes from "./routes/vless.js";
 import xrayRoutes from "./routes/xray.js";
 import notificationsRoutes from "./routes/notifications.js";
+import actionsRoutes from "./routes/actions.js";
 import { pool } from "./db/connect.js";
 import { syncVlessStats } from "./services/xray.js";
 import os from "os";
@@ -34,6 +35,7 @@ app.use("/api/vpn", vpnRoutes);
 app.use("/api/vless", vlessRoutes);
 app.use("/api/xray", xrayRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/actions", actionsRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
 

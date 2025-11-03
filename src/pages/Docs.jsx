@@ -2,78 +2,140 @@
 import React from "react";
 import PageShell from "../components/PageShell.jsx";
 import Modal from "../components/Modal.jsx";
-import backendTasksDoc from "../../docs/BACKEND_TASKS_POSTS_SYNC.md?raw";
-import outlineDoc from "../../docs/OUTLINE_VPN_INTEGRATION.md?raw";
-import notificationsDoc from "../../docs/NOTIFICATIONS_AND_DIGESTS.md?raw";
-import rbacDoc from "../../docs/RBAC_PERMISSIONS.md?raw";
+
+const docModules = import.meta.glob("../../docs/*.md", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+});
+
+function getFileName(path) {
+  const parts = path.split("/");
+  return parts[parts.length - 1] || "";
+}
+
+function slugifyBaseName(baseName) {
+  return baseName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function extractMetadata(rawContent) {
+  const metadata = {};
+  const lines = rawContent.split(/\r?\n/);
+  let bodyStartIndex = 0;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmedLine = line.trim();
+
+    if (!trimmedLine) {
+      if (Object.keys(metadata).length > 0) {
+        bodyStartIndex = index + 1;
+        continue;
+      }
+      bodyStartIndex = index + 1;
+      continue;
+    }
+
+    const match = trimmedLine.match(/^(name|description)\s*:\s*(.*)$/i);
+    if (match) {
+      const [, key, value] = match;
+      metadata[key.toLowerCase()] = value.trim();
+      bodyStartIndex = index + 1;
+      continue;
+    }
+
+    bodyStartIndex = index;
+    break;
+  }
+
+  const body = lines.slice(bodyStartIndex).join("\n").trim();
+
+  return {
+    metadata,
+    body,
+  };
+}
+
+function getResponsiveLimit() {
+  if (typeof window === "undefined") {
+    return 6;
+  }
+
+  if (window.matchMedia("(min-width: 768px)").matches) {
+    return 6;
+  }
+
+  return 4;
+}
+
+const internalDocs = Object.entries(docModules)
+  .map(([path, rawContent]) => {
+    const fileName = getFileName(path);
+    const baseName = fileName.replace(/\.md$/i, "");
+    const { metadata, body } = extractMetadata(rawContent);
+    const title = metadata.name || baseName;
+    const description = metadata.description || "";
+
+    return {
+      id: slugifyBaseName(baseName) || baseName,
+      title,
+      description,
+      content: body,
+      sourceName: fileName,
+      searchText: [title, description, baseName, body].filter(Boolean).join(" ").toLowerCase(),
+    };
+  })
+  .sort((left, right) => left.title.localeCompare(right.title, "ru", { sensitivity: "base" }));
 
 const docsSections = [
   {
-    title: "Исследования и аналитика",
+    title: "Продукт и аналитика",
     items: [
       { name: "Product Analytics 101", url: "https://productanalytics.example.com" },
-      { name: "JTBD: как понимать пользователей", url: "https://jtbdframework.example.com" },
+      { name: "JTBD: как понимать задачи пользователей", url: "https://jtbdframework.example.com" },
     ],
   },
   {
-    title: "Справочники разработчика",
+    title: "Фронтенд и экосистема",
     items: [
       { name: "MDN Web Docs", url: "https://developer.mozilla.org" },
       { name: "React Docs", url: "https://react.dev" },
     ],
   },
   {
-    title: "Командные площадки",
+    title: "Командные пространства",
     items: [
-      { name: "Рабочее пространство в Notion", url: "https://notion.so/workspace" },
-      { name: "База знаний в Confluence", url: "https://confluence.example.com" },
+      { name: "Рабочий хаб в Notion", url: "https://notion.so/workspace" },
+      { name: "Разделы проекта в Confluence", url: "https://confluence.example.com" },
     ],
-  },
-];
-
-const internalDocs = [
-  {
-    id: "backend-tasks",
-    title: "Синхронизация задач и постов",
-    description:
-      "REST API, миграции PostgreSQL и интеграция с AuthContext — перенос todo/notes на бэкенд.",
-    content: backendTasksDoc,
-  },
-  {
-    id: "outline",
-    title: "Интеграция Outline API",
-    description:
-      "Серверные маршруты, кеширование, UI для ключей, лимиты трафика и права доступа VPN.",
-    content: outlineDoc,
-  },
-  {
-    id: "notifications",
-    title: "Уведомления и дайджесты",
-    description:
-      "Центр уведомлений, IndexedDB, push через Service Worker и API журнала событий.",
-    content: notificationsDoc,
-  },
-  {
-    id: "rbac",
-    title: "RBAC и гранулярные права",
-    description:
-      "Permissions, middleware requirePermission, UI управления правами и новая маршрутизация.",
-    content: rbacDoc,
   },
 ];
 
 function DocCard({ doc, onRead }) {
   return (
-    <article className="flex flex-col gap-3 rounded-3xl border border-gray-200 bg-white/80 p-5 shadow-sm transition hover:border-blue-200 hover:shadow-lg hover:shadow-blue-500/10 dark:border-gray-700 dark:bg-slate-900/70">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{doc.title}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{doc.description}</p>
-      <button
-        type="button"
-        onClick={() => onRead(doc)}
-        className="mt-auto inline-flex w-fit items-center justify-center rounded-full border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-blue-400/40 dark:text-blue-200 dark:hover:border-blue-300/60 dark:hover:bg-blue-500/10"
-      >
-        Читать полностью
-      </button>
+    <article className="flex h-full flex-col gap-3 rounded-3xl border border-gray-200 bg-white/80 p-5 shadow-sm transition hover:border-blue-200 hover:shadow-lg hover:shadow-blue-500/10 dark:border-gray-700 dark:bg-slate-900/70">
+      <header className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+          {doc.sourceName}
+        </span>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{doc.title}</h3>
+      </header>
+      {doc.description && (
+        <p className="text-sm text-gray-600 dark:text-gray-400">{doc.description}</p>
+      )}
+      <div className="mt-auto">
+        <button
+          type="button"
+          onClick={() => onRead(doc)}
+          className="inline-flex items-center justify-center rounded-full border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-blue-400/40 dark:text-blue-200 dark:hover:border-blue-300/60 dark:hover:bg-blue-500/10"
+        >
+          Читать документ
+        </button>
+      </div>
     </article>
   );
 }
@@ -81,15 +143,38 @@ function DocCard({ doc, onRead }) {
 export default function Docs() {
   const [selectedDoc, setSelectedDoc] = React.useState(null);
   const [search, setSearch] = React.useState("");
+  const [visibleLimit, setVisibleLimit] = React.useState(getResponsiveLimit);
+  const [isExpanded, setIsExpanded] = React.useState(false);
 
   const normalizedQuery = search.trim().toLowerCase();
   const filteredInternalDocs = React.useMemo(() => {
-    if (!normalizedQuery) return internalDocs;
-    return internalDocs.filter((doc) => {
-      const haystack = `${doc.title} ${doc.description} ${doc.content}`.toLowerCase();
-      return haystack.includes(normalizedQuery);
-    });
+    if (!normalizedQuery) {
+      return internalDocs;
+    }
+
+    return internalDocs.filter((doc) => doc.searchText.includes(normalizedQuery));
   }, [normalizedQuery]);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setVisibleLimit(getResponsiveLimit());
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  React.useEffect(() => {
+    setIsExpanded(false);
+  }, [normalizedQuery]);
+
+  const shouldLimit = !isExpanded && !normalizedQuery;
+  const docsToRender = shouldLimit
+    ? filteredInternalDocs.slice(0, visibleLimit)
+    : filteredInternalDocs;
+  const hasMoreDocs = !normalizedQuery && filteredInternalDocs.length > visibleLimit;
+  const enableScroll = docsToRender.length > visibleLimit || isExpanded;
 
   return (
     <>
@@ -99,12 +184,22 @@ export default function Docs() {
       >
         <section className="rounded-3xl bg-white/80 p-6 shadow-sm transition-colors duration-500 dark:bg-slate-900/70">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Быстрый доступ к материалам
+            Внутренняя база знаний проекта
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Собрали внутренние конспекты и внешние ресурсы, которые помогают сопровождать портал и
-            инфраструктуру. Внутренние файлы можно раскрыть прямо отсюда, а внешние ссылки ведут в
-            знакомые хабы.
+            Здесь собраны технические заметки и карты внедрений. Добавляйте новые файлы в папку
+            <code className="mx-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700 dark:bg-slate-800 dark:text-gray-300">
+              docs/
+            </code>
+            , а внутри документа задавайте поля
+            <code className="mx-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700 dark:bg-slate-800 dark:text-gray-300">
+              name
+            </code>
+            и
+            <code className="mx-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700 dark:bg-slate-800 dark:text-gray-300">
+              description
+            </code>
+            , чтобы карточка выглядела аккуратно.
           </p>
         </section>
 
@@ -112,17 +207,18 @@ export default function Docs() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Внутренняя документация
+                Локальные документы (папка docs/)
               </h2>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Краткие карты задач и архитектуры. Нажмите «Читать полностью», чтобы раскрыть файл.
+                Используйте поиск по названию, описанию и содержимому. Без метаданных карточка
+                автоматически покажет имя файла и скроет описание.
               </p>
             </div>
             <div className="relative w-full max-w-xs">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Поиск по ключевым словам…"
+                placeholder="Поиск по документации"
                 className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-400 dark:border-gray-700 dark:bg-slate-800 dark:text-gray-100"
               />
               {search && (
@@ -131,7 +227,7 @@ export default function Docs() {
                   onClick={() => setSearch("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                 >
-                  Очистить
+                  Сбросить
                 </button>
               )}
             </div>
@@ -139,18 +235,47 @@ export default function Docs() {
 
           <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
             Найдено документов: {filteredInternalDocs.length}
+            {filteredInternalDocs.length !== docsToRender.length && (
+              <>
+                {" "}
+                · Показано: {docsToRender.length}
+              </>
+            )}
           </div>
 
           {filteredInternalDocs.length === 0 ? (
             <div className="mt-5 rounded-3xl border border-dashed border-gray-200 bg-white/80 p-6 text-sm text-gray-500 dark:border-gray-700 dark:bg-slate-900/60 dark:text-gray-400">
-              Ничего не найдено. Попробуйте уточнить запрос или ввести другую формулировку.
+              Документы не найдены. Уточните запрос или добавьте новый файл в каталог
+              <code className="mx-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700 dark:bg-slate-800 dark:text-gray-300">
+                docs/
+              </code>
+              .
             </div>
           ) : (
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredInternalDocs.map((doc) => (
-                <DocCard key={doc.id} doc={doc} onRead={setSelectedDoc} />
-              ))}
-            </div>
+            <>
+              <div
+                className={`mt-5 ${
+                  enableScroll ? "max-h-[60vh] overflow-y-auto pr-1" : ""
+                }`}
+              >
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {docsToRender.map((doc) => (
+                    <DocCard key={doc.id} doc={doc} onRead={setSelectedDoc} />
+                  ))}
+                </div>
+              </div>
+              {hasMoreDocs && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded((prev) => !prev)}
+                    className="inline-flex items-center justify-center rounded-full border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-blue-400/40 dark:text-blue-200 dark:hover:border-blue-300/60 dark:hover:bg-blue-500/10"
+                  >
+                    {isExpanded ? "Свернуть список" : "Показать остальные"}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
 
@@ -158,7 +283,7 @@ export default function Docs() {
           {docsSections.map((section) => (
             <section
               key={section.title}
-              className="flex flex-col gap-3 rounded-3xl bg-white/80 p-5 shadow-sm dark:bg-slate-900/70"
+              className="flex flex-col gap-3 rounded-3xl bg-white/80 p-5 shadow-sm transition hover:shadow-md dark:bg-slate-900/70"
             >
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {section.title}
@@ -173,7 +298,7 @@ export default function Docs() {
                       className="inline-flex items-center gap-2 text-blue-600 transition hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
                     >
                       {item.name}
-                      <span aria-hidden="true">↗</span>
+                      <span aria-hidden="true">→</span>
                     </a>
                   </li>
                 ))}
@@ -189,9 +314,21 @@ export default function Docs() {
         title={selectedDoc?.title || ""}
         maxWidth="max-w-3xl"
       >
-        <article className="space-y-3 whitespace-pre-wrap leading-relaxed text-gray-800 dark:text-gray-200">
-          {selectedDoc?.content}
-        </article>
+        {selectedDoc && (
+          <article className="space-y-4 leading-relaxed text-gray-800 dark:text-gray-200">
+            <header className="space-y-1">
+              <span className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {selectedDoc.sourceName}
+              </span>
+              {selectedDoc.description && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedDoc.description}
+                </p>
+              )}
+            </header>
+            <div className="whitespace-pre-wrap">{selectedDoc.content}</div>
+          </article>
+        )}
       </Modal>
     </>
   );

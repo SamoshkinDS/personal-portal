@@ -1,3 +1,6 @@
+name: Уведомления и дайджесты
+description: Потоки push-уведомлений, IndexedDB и REST API для подписок.
+
 Уведомления и дайджесты
 
 Цель: реализовать центр уведомлений: колокольчик в Header, выезжающая панель, хранение непрочитанных в IndexedDB. Подключить push через Service Worker, добавить API `/api/notifications` и отобразить журнал событий из `backend/routes/admin.js`.

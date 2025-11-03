@@ -19,7 +19,7 @@ const NAV = [
         <path d="M20 20V4" />
       </svg>
     ) },
-  { id: "ai", path: "/ai", label: "Нейросервисы", icon: (
+  { id: "ai", path: "/ai", label: "AI и ML", icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 6v4" />
         <path d="M12 14v4" />
@@ -234,4 +234,3 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
     </>
   );
 }
-
