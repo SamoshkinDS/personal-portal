@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -13,6 +13,7 @@ import { Toaster } from "react-hot-toast";
 import Sidebar from "./components/Sidebar.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import AI from "./pages/AI.jsx";
+import N8NIntegration from "./pages/N8NIntegration.jsx";
 import Docs from "./pages/Docs.jsx";
 import Posts from "./pages/Posts.jsx";
 import Settings from "./pages/Settings.jsx";
@@ -29,6 +30,7 @@ import VlessGuide from "./pages/vpn/VlessGuide.jsx";
 import RoutesGuide from "./pages/vpn/RoutesGuide.jsx";
 import VPNIndex from "./pages/vpn/Index.jsx";
 import OutlineGuide from "./pages/vpn/OutlineGuide.jsx";
+import DebugDnd from "./pages/DebugDnd.jsx";
 import { useEffect } from "react";
 import { registerPush } from "./push/registerPush.js";
 
@@ -56,7 +58,7 @@ function AppRoutes() {
     registerPush();
   }, []);
 
-  // Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ РїРµСЂРµРєР»СЋС‡Р°С‚РµР»СЊ РґР»СЏ PageShell/Header
+  // Глобальный переключатель для PageShell/Header
   React.useEffect(() => {
     window.__toggleSidebar = () => setMobileOpen((v) => !v);
     return () => {
@@ -64,12 +66,12 @@ function AppRoutes() {
     };
   }, []);
 
-  // Р—Р°РєСЂС‹РІР°РµРј РјРѕР±РёР»СЊРЅРѕРµ РјРµРЅСЋ РїСЂРё РЅР°РІРёРіР°С†РёРё РЅР° РЅРѕРІСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ
+  // Закрываем мобильное меню при навигации на новую страницу
   React.useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // РЎРІР°Р№РїС‹: РѕС‚РєСЂС‹С‚СЊ РѕС‚ Р»РµРІРѕРіРѕ РєСЂР°СЏ РІРїСЂР°РІРѕ, Р·Р°РєСЂС‹С‚СЊ вЂ” РІР»РµРІРѕ
+  // Свайпы: открыть от левого края вправо, закрыть — влево
   const touchRef = React.useRef({ startX: 0, startY: 0, tracking: false });
   const onTouchStart = (e) => {
     const t = e.touches?.[0];
@@ -81,7 +83,7 @@ function AppRoutes() {
     if (!t || !touchRef.current.tracking) return;
     const dx = t.clientX - touchRef.current.startX;
     const dy = t.clientY - touchRef.current.startY;
-    if (Math.abs(dy) > Math.abs(dx)) return; // РІРµСЂС‚РёРєР°Р»СЊ вЂ” РёРіРЅРѕСЂ
+    if (Math.abs(dy) > Math.abs(dx)) return; // вертикаль — игнор
     if (!mobileOpen && touchRef.current.startX < 24 && dx > 60) {
       setMobileOpen(true);
       touchRef.current.tracking = false;
@@ -128,7 +130,7 @@ function AppRoutes() {
       ) : (
         <div className="app-layout flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 text-gray-900 transition-colors duration-500 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 dark:text-gray-100">
           <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
-          {/* Р—РѕРЅР° Р·Р°С…РІР°С‚Р° СЃРІР°Р№РїР° РѕС‚ Р»РµРІРѕРіРѕ РєСЂР°СЏ РґР»СЏ iOS PWA Рё РјРѕР±РёР»СЊРЅС‹С… Р±СЂР°СѓР·РµСЂРѕРІ */}
+          {/* Зона захвата свайпа от левого края для iOS PWA и мобильных браузеров */}
           {!mobileOpen && (
             <div
               className="fixed inset-y-0 left-0 z-20 w-6 sm:hidden"
@@ -168,6 +170,18 @@ function AppRoutes() {
                         allowAnalytics ? (
                           <RouteTransition>
                             <Analytics />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/ai/n8n"
+                      element={
+                        allowAI ? (
+                          <RouteTransition>
+                            <N8NIntegration />
                           </RouteTransition>
                         ) : (
                           <NotFound />
@@ -282,6 +296,14 @@ function AppRoutes() {
                         )
                       }
                     />
+                    <Route
+                      path="/debug-dnd"
+                      element={
+                        <RouteTransition>
+                          <DebugDnd />
+                        </RouteTransition>
+                      }
+                    />
                     <Route path="/admin" element={can('admin_access') ? (<RouteTransition><AdminHome /></RouteTransition>) : (<NotFound />)} />
                     <Route
                       path="/admin/users"
@@ -319,3 +341,5 @@ export default function App() {
     </Router>
   );
 }
+
+

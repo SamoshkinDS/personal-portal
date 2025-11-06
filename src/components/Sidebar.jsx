@@ -26,7 +26,10 @@ const NAV = [
         <path d="M8 10h8" />
         <path d="M12 2a5 5 0 0 1 5 5v1a3 3 0 0 0 0 6v1a5 5 0 0 1-10 0v-1a3 3 0 0 0 0-6V7a5 5 0 0 1 5-5Z" />
       </svg>
-    ) },
+    ), children: [
+      { id: "ai-overview", path: "/ai", label: "Обзор" },
+      { id: "ai-n8n", path: "/ai/n8n", label: "N8N" },
+    ] },
   { id: "docs", path: "/docs", label: "Документация", icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
@@ -80,7 +83,11 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
   const location = useLocation();
   const { user } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expanded, setExpanded] = useState({ vpn: location.pathname.startsWith('/vpn'), admin: location.pathname.startsWith('/admin') });
+  const [expanded, setExpanded] = useState({
+    ai: location.pathname.startsWith('/ai'),
+    vpn: location.pathname.startsWith('/vpn'),
+    admin: location.pathname.startsWith('/admin'),
+  });
 
   const role = user?.role || 'NON_ADMIN';
   const filteredNav = useMemo(() => {
@@ -102,7 +109,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
       const hasActiveChild = item.children.some((c) => location.pathname.startsWith(c.path));
       const isOpen = !isCollapsed && !!expanded[item.id];
       const toggle = () => setExpanded((s) => ({ ...s, [item.id]: !s[item.id] }));
-      const groupRootPath = item.id === 'vpn' ? '/vpn' : item.id === 'admin' ? '/admin' : null;
+      const groupRootPath = item.id === 'vpn' ? '/vpn' : item.id === 'admin' ? '/admin' : item.id === 'ai' ? '/ai' : null;
       return (
         <div key={item.id} className="space-y-1">
           <button

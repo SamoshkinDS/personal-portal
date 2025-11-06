@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import cron from "node-cron";
@@ -6,12 +6,14 @@ import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import userRoutes from "./routes/user.js";
 import todosRoutes from "./routes/todos.js";
+import todoListsRoutes from "./routes/todoLists.js";
 import postsRoutes from "./routes/posts.js";
 import vpnRoutes from "./routes/vpn.js";
 import vlessRoutes from "./routes/vless.js";
 import xrayRoutes from "./routes/xray.js";
 import notificationsRoutes from "./routes/notifications.js";
 import actionsRoutes from "./routes/actions.js";
+import n8nRoutes from "./routes/n8n.js";
 import { pool } from "./db/connect.js";
 import { syncVlessStats } from "./services/xray.js";
 import os from "os";
@@ -30,12 +32,14 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/todos", todosRoutes);
+app.use("/api/todo-lists", todoListsRoutes);
 app.use("/api/posts", postsRoutes);
 app.use("/api/vpn", vpnRoutes);
 app.use("/api/vless", vlessRoutes);
 app.use("/api/xray", xrayRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/actions", actionsRoutes);
+app.use("/api/n8n", n8nRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
 
@@ -81,27 +85,46 @@ if (XRAY_CRON_ENABLED) {
       );
     `);
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS user_todos (
+      CREATE TABLE IF NOT EXISTS user_todo_lists (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        text VARCHAR(500) NOT NULL,
-        done BOOLEAN DEFAULT FALSE,
-        parent_id INTEGER REFERENCES user_todos(id) ON DELETE CASCADE,
+        title VARCHAR(120) NOT NULL,
         position INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
     await pool.query(`
-      ALTER TABLE user_todos
-        ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES user_todos(id) ON DELETE CASCADE,
-        ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 0,
+      ALTER TABLE user_todo_lists
         ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
     `);
     await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_todo_lists_user ON user_todo_lists(user_id, position);
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_todos (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        list_id INTEGER REFERENCES user_todo_lists(id) ON DELETE CASCADE,
+        text VARCHAR(500) NOT NULL,
+        done BOOLEAN DEFAULT FALSE,
+        position INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        due_at TIMESTAMP
+      );
+    `);
+    await pool.query(`
+      ALTER TABLE user_todos
+        ADD COLUMN IF NOT EXISTS list_id INTEGER REFERENCES user_todo_lists(id) ON DELETE CASCADE,
+        ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS due_at TIMESTAMP,
+        DROP COLUMN IF EXISTS parent_id;
+    `);
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_todos_user_id ON user_todos(user_id);
-      CREATE INDEX IF NOT EXISTS idx_user_todos_parent ON user_todos(user_id, parent_id);
-      CREATE INDEX IF NOT EXISTS idx_user_todos_position ON user_todos(user_id, parent_id, position);
+      CREATE INDEX IF NOT EXISTS idx_user_todos_list ON user_todos(user_id, list_id, position);
     `);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_posts (
@@ -126,14 +149,14 @@ if (XRAY_CRON_ENABLED) {
     `);
     await pool.query(`
       INSERT INTO permissions (key, description) VALUES
-        ('view_analytics','Доступ к разделу «Аналитика»'),
-        ('view_ai','Доступ к разделу «AI»'),
-        ('view_vpn','Доступ к разделу «VPN»'),
-        ('admin_access','Доступ в админ-панель'),
-        ('manage_users','Управление пользователями'),
-        ('view_logs','Просмотр логов'),
-        ('manage_content','Управление контентом'),
-        ('vpn_create','Создание VPN-ключей')
+        ('view_analytics','Р”РѕСЃС‚СѓРї Рє СЂР°Р·РґРµР»Сѓ В«РђРЅР°Р»РёС‚РёРєР°В»'),
+        ('view_ai','Р”РѕСЃС‚СѓРї Рє СЂР°Р·РґРµР»Сѓ В«AIВ»'),
+        ('view_vpn','Р”РѕСЃС‚СѓРї Рє СЂР°Р·РґРµР»Сѓ В«VPNВ»'),
+        ('admin_access','Р”РѕСЃС‚СѓРї РІ Р°РґРјРёРЅ-РїР°РЅРµР»СЊ'),
+        ('manage_users','РЈРїСЂР°РІР»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё'),
+        ('view_logs','РџСЂРѕСЃРјРѕС‚СЂ Р»РѕРіРѕРІ'),
+        ('manage_content','РЈРїСЂР°РІР»РµРЅРёРµ РєРѕРЅС‚РµРЅС‚РѕРј'),
+        ('vpn_create','РЎРѕР·РґР°РЅРёРµ VPN-РєР»СЋС‡РµР№')
       ON CONFLICT (key) DO NOTHING;
     `);
     await pool.query(`
@@ -195,12 +218,12 @@ if (XRAY_CRON_ENABLED) {
 
 // Test route
 app.get("/", (req, res) => {
-  res.send("✅ Backend is running!");
+  res.send("вњ… Backend is running!");
 });
 
 // Test /api
 app.get("/api", (req, res) => {
-  res.json({ message: "Backend is alive 🚀" });
+  res.json({ message: "Backend is alive рџљЂ" });
 });
 
 // Simple system stats endpoint
@@ -225,5 +248,5 @@ app.get("/api/system-stats", (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server started on http://localhost:${PORT}`);
+  console.log(`рџљЂ Server started on http://localhost:${PORT}`);
 });

@@ -29,3 +29,11 @@ body {
   /* единый контейнер иконок: размер/фон/кольцо */
   @apply h-10 w-10 shrink-0 rounded-xl bg-white/60 ring-1 ring-black/5 dark:bg-white/10 dark:ring-white/10 flex items-center justify-center;
 }
+
+.btn {
+  @apply inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply bg-indigo-600 text-white hover:bg-indigo-500 focus:ring-indigo-400;
+}
