@@ -38,5 +38,21 @@ export async function sendPushToAll(title, body, url = '/') {
   return { sent };
 }
 
+export async function sendPushToUser(userId, title, body, url = '/') {
+  if (!configured || !userId) return { sent: 0 };
+  const q = await pool.query('SELECT data FROM push_subscriptions WHERE user_id = $1', [userId]);
+  const subs = q.rows.map(r => r.data).filter(Boolean);
+  let sent = 0;
+  await Promise.allSettled(subs.map(async (sub) => {
+    try {
+      await webpush.sendNotification(sub, JSON.stringify({ title, body, url }));
+      sent++;
+    } catch (e) {
+      console.warn('[push] failed to send to subscription', e?.statusCode || e?.message || e);
+    }
+  }));
+  return { sent };
+}
+
 // auto-configure on import
 configureWebPushFromEnv();

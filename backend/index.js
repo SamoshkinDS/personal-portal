@@ -15,8 +15,15 @@ import notificationsRoutes from "./routes/notifications.js";
 import actionsRoutes from "./routes/actions.js";
 import n8nRoutes from "./routes/n8n.js";
 import notesRoutes from "./routes/notes.js";
+import accountingRoutes from "./routes/accounting.js";
 import { pool } from "./db/connect.js";
 import { syncVlessStats } from "./services/xray.js";
+import {
+  createUtilityPlaceholders,
+  notifyExpiringSubscriptions,
+  notifyLoanPayments,
+  tickIncomesForToday,
+} from "./services/accountingJobs.js";
 import os from "os";
 
 dotenv.config();
@@ -42,8 +49,10 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/actions", actionsRoutes);
 app.use("/api/n8n", n8nRoutes);
 app.use("/api/notes", notesRoutes);
+app.use("/api/accounting", accountingRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
+const ACCOUNTING_JOBS_ENABLED = String(process.env.ACCOUNTING_JOBS_DISABLED || "false").toLowerCase() !== "true";
 
 if (XRAY_CRON_ENABLED) {
   cron.schedule("*/5 * * * *", async () => {
@@ -58,9 +67,45 @@ if (XRAY_CRON_ENABLED) {
   });
 }
 
+if (ACCOUNTING_JOBS_ENABLED) {
+  cron.schedule("0 8 1 * *", async () => {
+    try {
+      await createUtilityPlaceholders();
+      console.log("[cron] accounting: created utility placeholders");
+    } catch (err) {
+      console.warn("[cron] accounting utilities failed", err.message || err);
+    }
+  });
+  cron.schedule("0 9 * * *", async () => {
+    try {
+      await notifyExpiringSubscriptions();
+      await notifyLoanPayments();
+    } catch (err) {
+      console.warn("[cron] accounting reminders failed", err.message || err);
+    }
+  });
+  cron.schedule("30 9 * * *", async () => {
+    try {
+      await tickIncomesForToday();
+    } catch (err) {
+      console.warn("[cron] accounting incomes failed", err.message || err);
+    }
+  });
+}
+
 // Ensure DB tables and columns exist
 (async () => {
   try {
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION set_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -158,7 +203,10 @@ if (XRAY_CRON_ENABLED) {
         ('manage_users','РЈРїСЂР°РІР»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё'),
         ('view_logs','РџСЂРѕСЃРјРѕС‚СЂ Р»РѕРіРѕРІ'),
         ('manage_content','РЈРїСЂР°РІР»РµРЅРёРµ РєРѕРЅС‚РµРЅС‚РѕРј'),
-        ('vpn_create','РЎРѕР·РґР°РЅРёРµ VPN-РєР»СЋС‡РµР№')
+        ('vpn_create','РЎРѕР·РґР°РЅРёРµ VPN-РєР»СЋС‡РµР№'),
+        ('accounting:view','Р‘СѓС…РіР°Р»С‚РµСЂРёСЏ: РїСЂРѕСЃРјРѕС‚СЂ'),
+        ('accounting:edit','Р‘СѓС…РіР°Р»С‚РµСЂРёСЏ: СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ'),
+        ('accounting:admin','Р‘СѓС…РіР°Р»С‚РµСЂРёСЏ: РЅР°СЃС‚СЂРѕР№РєРё')
       ON CONFLICT (key) DO NOTHING;
     `);
     await pool.query(`
@@ -223,7 +271,199 @@ if (XRAY_CRON_ENABLED) {
       CREATE INDEX IF NOT EXISTS idx_vless_stats_email_created_at
         ON vless_stats(email, created_at DESC);
     `);
-    console.log("DB: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats are ready");
+    await pool.query(`
+      DO $$ BEGIN
+        CREATE TYPE payment_type AS ENUM ('mortgage','loan','utilities','parking_rent','mobile','subscription');
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('expense','income')),
+        color_hex TEXT,
+        is_system BOOLEAN NOT NULL DEFAULT FALSE,
+        mcc_mask TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS categories_user_name_uk ON categories(user_id, name);
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type payment_type NOT NULL,
+        title TEXT NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        notes TEXT,
+        billing_period TEXT,
+        billing_day INT,
+        start_date DATE,
+        end_date DATE,
+        service_url TEXT,
+        provider TEXT,
+        principal_total NUMERIC(14,2),
+        interest_rate_apy NUMERIC(6,3),
+        term_months INT,
+        day_of_month INT,
+        is_annuity BOOLEAN,
+        account_currency TEXT,
+        is_indefinite BOOLEAN DEFAULT FALSE,
+        last_amount NUMERIC(14,2),
+        renewal_date DATE,
+        amount NUMERIC(14,2),
+        currency TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS payments_user_type_idx ON payments(user_id, type);
+      CREATE INDEX IF NOT EXISTS payments_renewal_idx ON payments(renewal_date);
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        transaction_date DATE NOT NULL,
+        description TEXT,
+        category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+        payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+        amount_operation NUMERIC(14,2),
+        currency_operation TEXT,
+        amount_account NUMERIC(14,2),
+        currency_account TEXT,
+        authorization_code TEXT,
+        mcc TEXT,
+        is_income BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS transactions_user_date_idx ON transactions(user_id, transaction_date DESC);
+      CREATE INDEX IF NOT EXISTS transactions_user_category_idx ON transactions(user_id, category_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_payment_idx ON transactions(user_id, payment_id);
+      CREATE INDEX IF NOT EXISTS transactions_search_idx ON transactions USING GIN (to_tsvector('simple', coalesce(description,'')));
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS incomes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        source_name TEXT NOT NULL,
+        amount NUMERIC(14,2) NOT NULL,
+        currency TEXT NOT NULL,
+        periodicity TEXT NOT NULL CHECK (periodicity IN ('monthly','quarterly','custom_ndays')),
+        n_days INT,
+        next_date DATE NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        income_category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS incomes_user_next_idx ON incomes(user_id, next_date);
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dashboard_preferences (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        show_kpis BOOLEAN DEFAULT TRUE,
+        show_pie_categories BOOLEAN DEFAULT TRUE,
+        show_upcoming_payments BOOLEAN DEFAULT TRUE,
+        show_subscriptions BOOLEAN DEFAULT TRUE,
+        show_income_forecast BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS accounts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('card','cash','deposit','other')),
+        currency TEXT NOT NULL DEFAULT 'RUB',
+        initial_balance NUMERIC(14,2) DEFAULT 0,
+        current_balance NUMERIC(14,2) DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS accounts_user_idx ON accounts(user_id, created_at DESC);
+    `);
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'categories_set_updated_at') THEN
+          CREATE TRIGGER categories_set_updated_at
+          BEFORE UPDATE ON categories
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'payments_set_updated_at') THEN
+          CREATE TRIGGER payments_set_updated_at
+          BEFORE UPDATE ON payments
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'transactions_set_updated_at') THEN
+          CREATE TRIGGER transactions_set_updated_at
+          BEFORE UPDATE ON transactions
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'incomes_set_updated_at') THEN
+          CREATE TRIGGER incomes_set_updated_at
+          BEFORE UPDATE ON incomes
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'dashboard_preferences_set_updated_at') THEN
+          CREATE TRIGGER dashboard_preferences_set_updated_at
+          BEFORE UPDATE ON dashboard_preferences
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'accounts_set_updated_at') THEN
+          CREATE TRIGGER accounts_set_updated_at
+          BEFORE UPDATE ON accounts
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        END IF;
+      END $$;
+    `);
+    await pool.query(`
+      ALTER TABLE transactions
+        ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES accounts(id) ON DELETE SET NULL;
+    `);
+    const systemCategories = [
+      { name: 'Коммунальные', type: 'expense', color: '#f97316' },
+      { name: 'Ипотека', type: 'expense', color: '#f97316' },
+      { name: 'Кредит', type: 'expense', color: '#f97316' },
+      { name: 'Связь', type: 'expense', color: '#0ea5e9' },
+      { name: 'Подписки', type: 'expense', color: '#a855f7' },
+      { name: 'Зарплата', type: 'income', color: '#10b981' },
+      { name: 'Разовый доход', type: 'income', color: '#34d399' },
+      { name: 'Поддержка семьи', type: 'income', color: '#60a5fa' },
+      { name: 'Возврат средств', type: 'income', color: '#fbbf24' },
+    ];
+    for (const cat of systemCategories) {
+      await pool.query(
+        `
+        INSERT INTO categories (id, user_id, name, type, color_hex, is_system)
+        SELECT gen_random_uuid(), u.id, $1, $2, $3, TRUE
+        FROM users u
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM categories c
+          WHERE c.user_id = u.id AND lower(c.name) = lower($1)
+        );
+        `,
+        [cat.name, cat.type, cat.color]
+      );
+    }
+    await pool.query(`
+      INSERT INTO dashboard_preferences (user_id)
+      SELECT id FROM users
+      ON CONFLICT (user_id) DO NOTHING;
+    `);
+    console.log("DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences");
   } catch (err) {
     console.error("DB init error", err);
   }

@@ -1,4 +1,4 @@
-﻿// encoding: utf-8
+// encoding: utf-8
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -143,6 +143,33 @@ export default function Home() {
   const { user } = useAuth();
   const [runningAction, setRunningAction] = React.useState(null);
   const [actionResult, setActionResult] = React.useState(null);
+  const accountingAvailable = React.useMemo(() => {
+    if (!user) return false;
+    if (user.role === "ALL") return true;
+    const perms = new Set(user.permissions || []);
+    return perms.has("accounting:view") || perms.has("accounting:edit") || perms.has("accounting:admin");
+  }, [user]);
+  const links = React.useMemo(() => {
+    if (!accountingAvailable) return quickLinks;
+    return [
+      ...quickLinks,
+      {
+        to: "/accounting",
+        title: "Финансы",
+        description: "Дашборд, платежи, транзакции и прогнозы",
+        badge: "Финансы",
+        iconBg: "bg-fuchsia-500/10 text-fuchsia-500 dark:bg-fuchsia-400/10 dark:text-fuchsia-300",
+        glow: "bg-fuchsia-500/20",
+        icon: (
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 3v18" />
+            <path d="M3 9h18" />
+          </svg>
+        ),
+      },
+    ];
+  }, [accountingAvailable]);
 
   const spinnerIcon = (
     <svg className="h-5 w-5 animate-spin text-blue-500 dark:text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -203,7 +230,7 @@ export default function Home() {
 
       <section className="mt-2">
         <div className="flex gap-4 overflow-x-auto pb-4 pt-1 [-webkit-overflow-scrolling:touch] snap-x snap-mandatory md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:pb-0 md:pt-0 xl:grid-cols-4">
-          {quickLinks.map((item) => (
+          {links.map((item) => (
             <motion.div key={item.to} whileHover={{ y: -4 }} className="w-[240px] flex-shrink-0 snap-start md:w-auto">
               <Link
                 to={item.to}

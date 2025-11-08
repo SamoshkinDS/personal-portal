@@ -17,6 +17,13 @@ import N8NIntegration from "./pages/N8NIntegration.jsx";
 import Docs from "./pages/Docs.jsx";
 import Posts from "./pages/Posts.jsx";
 import Settings from "./pages/Settings.jsx";
+import AccountingDashboard from "./pages/accounting/Dashboard.jsx";
+import AccountingAccounts from "./pages/accounting/Accounts.jsx";
+import AccountingPayments from "./pages/accounting/Payments.jsx";
+import AccountingTransactions from "./pages/accounting/Transactions.jsx";
+import AccountingIncomes from "./pages/accounting/Incomes.jsx";
+import AccountingCategories from "./pages/accounting/Categories.jsx";
+import AccountingSettings from "./pages/accounting/Settings.jsx";
 import Login from "./pages/Login.jsx";
 import AdminHome from "./pages/admin/Index.jsx";
 import AdminContent from "./pages/admin/Content.jsx";
@@ -150,10 +157,16 @@ function AppRoutes() {
               {(() => {
                 const role = user?.role || "NON_ADMIN";
                 const perms = new Set(user?.permissions || []);
-                const can = (p) => role === 'ALL' || perms.has(p);
+                const hasPermission = (perm) =>
+                  role === 'ALL' || perms.has('admin_access') || perms.has(perm);
+                const can = hasPermission;
                 const allowAnalytics = can('view_analytics');
                 const allowAI = can('view_ai');
-                const allowVPN = can('view_vpn');
+                const allowVPN = can('view_vpn') || user?.vpnCanCreate;
+                const allowAccountingAdmin = can('accounting:admin');
+                const allowAccountingEdit = allowAccountingAdmin || can('accounting:edit');
+                const allowAccounting =
+                  allowAccountingEdit || can('accounting:view') || perms.size === 0;
                 return (
                   <>
                     <Route
@@ -214,6 +227,90 @@ function AppRoutes() {
                         <RouteTransition>
                           <Posts />
                         </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/accounting"
+                      element={
+                        allowAccounting ? (
+                          <RouteTransition>
+                            <AccountingDashboard />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/accounting/accounts"
+                      element={
+                        allowAccountingEdit ? (
+                          <RouteTransition>
+                            <AccountingAccounts />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/accounting/payments"
+                      element={
+                        allowAccountingEdit ? (
+                          <RouteTransition>
+                            <AccountingPayments />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/accounting/transactions"
+                      element={
+                        allowAccountingEdit ? (
+                          <RouteTransition>
+                            <AccountingTransactions />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/accounting/incomes"
+                      element={
+                        allowAccountingEdit ? (
+                          <RouteTransition>
+                            <AccountingIncomes />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/accounting/categories"
+                      element={
+                        allowAccountingEdit ? (
+                          <RouteTransition>
+                            <AccountingCategories />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/accounting/settings"
+                      element={
+                        allowAccountingAdmin ? (
+                          <RouteTransition>
+                            <AccountingSettings />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
                       }
                     />
                     <Route
