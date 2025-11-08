@@ -14,6 +14,7 @@ import xrayRoutes from "./routes/xray.js";
 import notificationsRoutes from "./routes/notifications.js";
 import actionsRoutes from "./routes/actions.js";
 import n8nRoutes from "./routes/n8n.js";
+import notesRoutes from "./routes/notes.js";
 import { pool } from "./db/connect.js";
 import { syncVlessStats } from "./services/xray.js";
 import os from "os";
@@ -40,6 +41,7 @@ app.use("/api/xray", xrayRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/actions", actionsRoutes);
 app.use("/api/n8n", n8nRoutes);
+app.use("/api/notes", notesRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
 
@@ -170,6 +172,17 @@ if (XRAY_CRON_ENABLED) {
       );
     `);
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS notes (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        content TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+    `);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS admin_logs (
         id SERIAL PRIMARY KEY,
         created_at TIMESTAMP DEFAULT NOW(),
@@ -210,7 +223,7 @@ if (XRAY_CRON_ENABLED) {
       CREATE INDEX IF NOT EXISTS idx_vless_stats_email_created_at
         ON vless_stats(email, created_at DESC);
     `);
-    console.log("DB: users, user_profiles, user_todos, user_posts, content_items, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats are ready");
+    console.log("DB: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats are ready");
   } catch (err) {
     console.error("DB init error", err);
   }
