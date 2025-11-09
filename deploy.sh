@@ -109,6 +109,7 @@ else
 fi
 
 echo "🩺 Checking API..."
+sleep 5  # даём сервису 5 секунды на запуск
 if curl -fs http://127.0.0.1:4000/api/ >/dev/null; then
   echo "✅ Backend доступен локально"
 else
