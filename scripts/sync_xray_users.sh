@@ -1,4 +1,7 @@
 #!/bin/bash
+if [ "${XRAY_SYNC_NONINTERACTIVE}" = "1" ] && [ -n "${DB_PASSWORD}" ]; then
+  export PGPASSWORD="${DB_PASSWORD}"
+fi
 # Путь к конфигу Xray
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 # Временный файл для нового конфига

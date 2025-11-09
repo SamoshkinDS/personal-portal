@@ -19,9 +19,11 @@ router.use(authRequired, requirePermission(["admin_access"]));
 // POST /api/xray/sync
 router.post("/sync", async (req, res) => {
   try {
+    const env = { ...process.env, XRAY_SYNC_NONINTERACTIVE: "1" };
     const { stdout, stderr } = await execFile("sudo", ["bash", XRAY_SYNC_SCRIPT], {
       timeout: 30000,
       maxBuffer: 2 * 1024 * 1024,
+      env,
     });
     res.json({ ok: true, stdout, stderr });
   } catch (err) {
