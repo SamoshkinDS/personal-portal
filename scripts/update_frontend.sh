@@ -2,6 +2,12 @@
 set -euo pipefail
 
 PROJECT_DIR="${PROJECT_DIR:-/var/www/personal-portal}"
+LOG_DIR="${LOG_DIR:-/var/log/personal-portal}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/frontend-build.log}"
+
+mkdir -p "$LOG_DIR"
+touch "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=== Frontend build started at $(date '+%Y-%m-%d %H:%M:%S') ==="
 cd "$PROJECT_DIR"
@@ -15,7 +21,8 @@ if ! npm ci --no-audit --no-fund; then
 fi
 
 echo "-- Building frontend..."
-npm run build
+export PATH="$PROJECT_DIR/node_modules/.bin:$PATH"
+npx vite build
 
 if command -v nginx >/dev/null 2>&1; then
   echo "-- Reloading Nginx..."
@@ -26,4 +33,9 @@ if command -v nginx >/dev/null 2>&1; then
   fi
 fi
 
-echo "=== Frontend build finished ==="
+if [ -d "$PROJECT_DIR/dist" ]; then
+  echo "=== Frontend build finished successfully ==="
+else
+  echo "!! dist directory not found after build" >&2
+  exit 1
+fi

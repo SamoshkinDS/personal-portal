@@ -1,90 +1,95 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 PROJECT_DIR="/var/www/personal-portal"
 BACKEND_DIR="$PROJECT_DIR/backend"
 BRANCH="main"
 SERVICE_NAME="personal-portal-backend"
 BACKUP_DIR="/tmp/personal-portal-env-backup"
+LOG_DIR="/var/log/personal-portal"
+LOG_FILE="$LOG_DIR/deploy.log"
 
-echo "=== 🚀 Starting deploy at $(date) ==="
+mkdir -p "$LOG_DIR"
+touch "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE") 2>&1
 
-# 🧾 Проверка прав и попытка автоисправления
+NOW_TS=$(date '+%Y-%m-%d %H:%M:%S')
+echo "=== ✅ Starting deploy at $NOW_TS ==="
+echo "🧩 Node version: $(node -v)"
+echo "🧩 NPM version: $(npm -v)"
+
 if [ ! -w "$PROJECT_DIR" ]; then
-  echo "⚠️ Недостаточно прав на $PROJECT_DIR, пытаюсь исправить..."
-  sudo chown -R $(whoami):www-data "$PROJECT_DIR" || echo "⚠️ Не удалось сменить владельца (нужен sudo)"
-  sudo chmod -R 775 "$PROJECT_DIR" || echo "⚠️ Не удалось применить chmod (нужен sudo)"
+  echo "⚠️ Нет прав на запись в $PROJECT_DIR, пытаюсь поправить..."
+  sudo chown -R $(whoami):www-data "$PROJECT_DIR" || echo "⚠️ Не удалось изменить владельца (нужно sudo)"
+  sudo chmod -R 775 "$PROJECT_DIR" || echo "⚠️ Не удалось изменить права (нужно sudo)"
 fi
 
-# 💾 Резервная копия .env перед обновлением
-echo "💾 Backing up environment files..."
+echo "📦 Backing up environment files..."
 mkdir -p "$BACKUP_DIR"
 if [ -f "$BACKEND_DIR/.env" ]; then
   cp "$BACKEND_DIR/.env" "$BACKUP_DIR/" 2>/dev/null || sudo cp "$BACKEND_DIR/.env" "$BACKUP_DIR/"
 fi
 
-# 📦 GIT update
 cd "$PROJECT_DIR"
-echo "📦 Updating repository..."
-git fetch origin "$BRANCH" || { echo "⚠️ Git fetch failed"; exit 1; }
-git reset --hard "origin/$BRANCH" || { echo "⚠️ Git reset failed"; exit 1; }
+echo "🔄 Updating repository..."
+git fetch origin "$BRANCH" || { echo "❌ Git fetch failed"; exit 1; }
+git reset --hard "origin/$BRANCH" || { echo "❌ Git reset failed"; exit 1; }
 
-# 🧩 Установка зависимостей фронта
-echo "🧩 Installing frontend dependencies..."
+echo "🔧 Installing frontend dependencies..."
 if ! npm ci --no-audit --no-fund; then
-  echo "⚠️ npm install failed, пытаюсь исправить права и повторить..."
+  echo "⚠️ npm ci failed, trying to fix permissions..."
   sudo chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
   sudo chmod -R 775 node_modules package-lock.json 2>/dev/null || true
-  npm ci --no-audit --no-fund || { echo "❌ npm install все еще не удалось"; exit 1; }
+  npm ci --no-audit --no-fund || { echo "❌ npm install окончательно упал"; exit 1; }
 fi
 
-# 🏗️ Сборка фронтенда
 echo "🏗️ Building frontend..."
-npm run build || { echo "❌ Frontend build failed"; exit 1; }
+export PATH="$PROJECT_DIR/node_modules/.bin:$PATH"
+npx vite build || { echo "❌ Frontend build failed"; exit 1; }
+if [ -d "$PROJECT_DIR/dist" ]; then
+  echo "✅ Frontend build completed"
+else
+  echo "❌ Frontend build directory not found" >&2
+  exit 1
+fi
 
-# 🛠️ Backend
-echo "🛠️ Updating backend..."
+echo "🛠️ Updating backend dependencies..."
 cd "$BACKEND_DIR"
 if ! npm ci --no-audit --no-fund; then
-  echo "⚠️ Backend npm install failed, пытаюсь исправить права..."
+  echo "⚠️ Backend npm ci failed, trying to fix permissions..."
   sudo chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
   sudo chmod -R 775 node_modules package-lock.json 2>/dev/null || true
-  npm ci --no-audit --no-fund || { echo "❌ Backend npm install все еще не удалось"; exit 1; }
+  npm ci --no-audit --no-fund || { echo "❌ Backend npm install окончательно упал"; exit 1; }
 fi
 
-# ♻️ Перезапуск сервиса
-echo "♻️ Restarting backend service..."
+cd "$PROJECT_DIR"
+echo "🔁 Restarting backend service..."
 if sudo systemctl restart "$SERVICE_NAME"; then
   echo "✅ Сервис $SERVICE_NAME успешно перезапущен"
 else
-  echo "⚠️ Не удалось перезапустить сервис, проверь systemctl status"
+  echo "❌ Не удалось перезапустить $SERVICE_NAME, смотрите systemctl status" >&2
+  exit 1
 fi
 
-
-
-# 🌐 Проверка nginx
 echo "🌐 Reloading Nginx..."
 if sudo nginx -t; then
-  sudo systemctl reload nginx
-  echo "✅ Nginx успешно перезагружен"
+  sudo systemctl reload nginx || echo "⚠️ Не удалось перезагрузить Nginx" >&2
+  echo "✅ Nginx конфигурация применена"
 else
-  echo "⚠️ Ошибка проверки nginx.conf"
+  echo "❌ nginx configuration test failed" >&2
 fi
 
-
-
-# 🩺 Health check
 echo "🩺 Checking API..."
 if curl -fs http://127.0.0.1:4000/api/ >/dev/null; then
-  echo "✅ Backend работает локально"
+  echo "✅ Backend доступен локально"
 else
-  echo "⚠️ Backend не отвечает локально"
+  echo "❌ Backend не отвечает локально" >&2
 fi
 
 if curl -fs -k https://samoshechkin.ru/api/ >/dev/null; then
   echo "✅ API доступен публично"
 else
-  echo "⚠️ API не доступен извне"
+  echo "❌ API недоступен публично" >&2
 fi
 
-echo "=== ✅ Deploy complete at $(date) ==="
+echo "=== ✅ Deploy complete at $(date '+%Y-%m-%d %H:%M:%S') ==="
