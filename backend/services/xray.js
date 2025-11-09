@@ -237,6 +237,11 @@ export async function syncVlessStats({ emails, thresholdBytes = ONE_MB } = {}) {
   for (const email of targets) {
     try {
       const stats = await getXrayUserTraffic(email);
+      // Если Xray только что перезапустили и счётчики обнулились — не перетирать БД нулями
+      if (Number(stats.uplink || 0) === 0 && Number(stats.downlink || 0) === 0) {
+        results.push({ ...stats, persisted: false, skipped: 'zero' });
+        continue;
+      }
       let rows;
       try {
         const resSel = await pool.query(

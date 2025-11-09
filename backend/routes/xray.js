@@ -1,6 +1,6 @@
 import express from "express";
 import { authRequired, requirePermission } from "../middleware/auth.js";
-import { execFile as _execFile } from "node:child_process";
+import { execFile as _execFile, spawn as _spawn } from "node:child_process";
 import { promisify } from "node:util";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -23,12 +23,15 @@ router.post("/sync", async (req, res) => {
     const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
     const program = isRoot ? "bash" : "sudo";
     const args = isRoot ? [XRAY_SYNC_SCRIPT] : ["-n", "bash", XRAY_SYNC_SCRIPT];
-    const { stdout, stderr } = await execFile(program, args, {
-      timeout: 30000,
-      maxBuffer: 2 * 1024 * 1024,
+
+    // Запускаем асинхронно, чтобы успеть ответить до рестарта Xray (иначе VPN рвёт соединение)
+    const child = _spawn(program, args, {
       env,
+      detached: true,
+      stdio: "ignore",
     });
-    res.json({ ok: true, stdout, stderr });
+    child.unref();
+    res.json({ ok: true, started: true, pid: child.pid });
   } catch (err) {
     const stderr = String(err.stderr || "");
     const passwordError = stderr.includes("a password is required") || stderr.includes("terminal is required");

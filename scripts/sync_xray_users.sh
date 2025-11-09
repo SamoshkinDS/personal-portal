@@ -48,7 +48,13 @@ if [ -z "$USERS_CSV" ]; then
 fi
 
 # CSV -> JSON and map to {id,email}
-USERS_JSON=$(printf '%s\n' "$USERS_CSV" | jq -R -s -c 'split("\n")[:-1] | map(split(",") | {"id": .[0], "email": (. [1] + "@vpn")})')
+USERS_JSON=$(printf '%s\n' "$USERS_CSV" | jq -R -s -c '
+  split("\n")[:-1]
+  | map(
+      split(",")
+      | {"id": .[0], "email": (.[1] | if contains("@") then . else . + "@vpn" end)}
+    )
+')
 if [ -z "$USERS_JSON" ] || [ "$USERS_JSON" = "[]" ]; then
   echo "[ERROR] Список пользователей пуст" >&2
   exit 1
