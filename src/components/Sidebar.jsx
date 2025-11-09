@@ -113,6 +113,7 @@ const NAV = [
       </svg>
     ),
     children: [
+      { id: "vpn-home", path: "/vpn", label: "Главная" },
       { id: "vpn-outline", path: "/vpn/outline", label: "Outline" },
       { id: "vpn-vless", path: "/vpn/vless", label: "VLESS" },
     ],
@@ -127,6 +128,7 @@ const NAV = [
       </svg>
     ),
     children: [
+      { id: "admin-home", path: "/admin", label: "Главная" },
       { id: "admin-users", path: "/admin/users", label: "Пользователи" },
       { id: "admin-content", path: "/admin/content", label: "Контент" },
       { id: "admin-logs", path: "/admin/logs", label: "Журнал" },
