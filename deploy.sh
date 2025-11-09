@@ -50,15 +50,30 @@ git fetch origin "$BRANCH" || { echo "❌ Git fetch failed"; exit 1; }
 git reset --hard "origin/$BRANCH" || { echo "❌ Git reset failed"; exit 1; }
 
 echo "🔧 Installing frontend dependencies..."
-if ! npm ci --no-audit --no-fund; then
+if ! (
+  cd "$PROJECT_DIR"
+  export npm_config_production=false
+  npm ci --no-audit --no-fund
+); then
   echo "⚠️ npm ci failed, trying to fix permissions..."
-  run_cmd chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
-  run_cmd chmod -R 775 node_modules package-lock.json 2>/dev/null || true
-  npm ci --no-audit --no-fund || { echo "❌ npm install окончательно упал"; exit 1; }
+  run_cmd chown -R $(whoami):www-data "$PROJECT_DIR/node_modules" "$PROJECT_DIR/package-lock.json" 2>/dev/null || true
+  run_cmd chmod -R 775 "$PROJECT_DIR/node_modules" "$PROJECT_DIR/package-lock.json" 2>/dev/null || true
+  (
+    cd "$PROJECT_DIR"
+    export npm_config_production=false
+    npm ci --no-audit --no-fund
+  ) || { echo "❌ npm install окончательно упал"; exit 1; }
 fi
 
 echo "🏗️ Building frontend..."
 export PATH="$PROJECT_DIR/node_modules/.bin:$PATH"
+if ! command -v vite >/dev/null 2>&1; then
+  echo "ℹ️ vite not found in PATH — installing as devDependency..."
+  (
+    cd "$PROJECT_DIR"
+    npm_config_production=false npm i -D vite@^7
+  )
+fi
 npx vite build || { echo "❌ Frontend build failed"; exit 1; }
 if [ -d "$PROJECT_DIR/dist" ]; then
   echo "✅ Frontend build completed"
