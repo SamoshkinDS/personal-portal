@@ -20,18 +20,25 @@ router.use(authRequired, requirePermission(["admin_access"]));
 router.post("/sync", async (req, res) => {
   try {
     const env = { ...process.env, XRAY_SYNC_NONINTERACTIVE: "1" };
-    const { stdout, stderr } = await execFile("sudo", ["-n", "bash", XRAY_SYNC_SCRIPT], {
+    const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+    const program = isRoot ? "bash" : "sudo";
+    const args = isRoot ? [XRAY_SYNC_SCRIPT] : ["-n", "bash", XRAY_SYNC_SCRIPT];
+    const { stdout, stderr } = await execFile(program, args, {
       timeout: 30000,
       maxBuffer: 2 * 1024 * 1024,
       env,
     });
     res.json({ ok: true, stdout, stderr });
   } catch (err) {
-    const passwordError = err.stderr?.includes("a password is required") || err.stderr?.includes("terminal is required");
+    const stderr = String(err.stderr || "");
+    const passwordError = stderr.includes("a password is required") || stderr.includes("terminal is required");
+    const timedOut = err.killed === true && err.signal === "SIGTERM";
     const errorMessage = passwordError
       ? "Недостаточно прав: настройте sudo без запроса пароля для XRAY_SYNC_SCRIPT."
+      : timedOut
+      ? "Тайм-аут выполнения скрипта (30 сек). Проверьте логи xray и права."
       : err.message;
-    res.status(500).json({ ok: false, error: errorMessage, stdout: err.stdout || "", stderr: err.stderr || "" });
+    res.status(500).json({ ok: false, error: errorMessage, stdout: err.stdout || "", stderr });
   }
 });
 

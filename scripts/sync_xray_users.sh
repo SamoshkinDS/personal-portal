@@ -17,8 +17,8 @@ if [ -f "$ENV_FILE" ]; then
   done < <(grep -E '^(DB_NAME|DB_USER|DB_PASSWORD|DB_HOST|XRAY_CONFIG_PATH|XRAY_INBOUND_TAG)=' "$ENV_FILE" || true)
 fi
 
-# Non-interactive psql password when called from API
-if [ "${XRAY_SYNC_NONINTERACTIVE:-}" = "1" ] && [ -n "${DB_PASSWORD:-}" ]; then
+# Если в .env есть пароль БД — передадим его psql всегда (без интерактива)
+if [ -n "${DB_PASSWORD:-}" ]; then
   export PGPASSWORD="$DB_PASSWORD"
 fi
 
@@ -71,4 +71,3 @@ fi
 mv "$TMP_FILE" "$CONFIG_FILE"
 systemctl restart xray
 echo "[OK] Конфигурация клиентов Xray обновлена."
-
