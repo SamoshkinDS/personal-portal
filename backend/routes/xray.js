@@ -1,11 +1,11 @@
 import express from "express";
 import { authRequired, requirePermission } from "../middleware/auth.js";
-import { exec as _exec } from "node:child_process";
+import { execFile as _execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const exec = promisify(_exec);
+const execFile = promisify(_execFile);
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.use(authRequired, requirePermission(["admin_access"]));
 // POST /api/xray/sync
 router.post("/sync", async (req, res) => {
   try {
-    const { stdout, stderr } = await exec(`sudo ${XRAY_SYNC_SCRIPT}`, {
+    const { stdout, stderr } = await execFile("sudo", ["bash", XRAY_SYNC_SCRIPT], {
       timeout: 30000,
       maxBuffer: 2 * 1024 * 1024,
     });
