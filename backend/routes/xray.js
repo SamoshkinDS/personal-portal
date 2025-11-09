@@ -20,14 +20,18 @@ router.use(authRequired, requirePermission(["admin_access"]));
 router.post("/sync", async (req, res) => {
   try {
     const env = { ...process.env, XRAY_SYNC_NONINTERACTIVE: "1" };
-    const { stdout, stderr } = await execFile("sudo", ["bash", XRAY_SYNC_SCRIPT], {
+    const { stdout, stderr } = await execFile("sudo", ["-n", "bash", XRAY_SYNC_SCRIPT], {
       timeout: 30000,
       maxBuffer: 2 * 1024 * 1024,
       env,
     });
     res.json({ ok: true, stdout, stderr });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message, stdout: err.stdout || "", stderr: err.stderr || "" });
+    const passwordError = err.stderr?.includes("a password is required") || err.stderr?.includes("terminal is required");
+    const errorMessage = passwordError
+      ? "Недостаточно прав: настройте sudo без запроса пароля для XRAY_SYNC_SCRIPT."
+      : err.message;
+    res.status(500).json({ ok: false, error: errorMessage, stdout: err.stdout || "", stderr: err.stderr || "" });
   }
 });
 
