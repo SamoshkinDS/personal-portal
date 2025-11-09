@@ -13,6 +13,20 @@ mkdir -p "$LOG_DIR"
 touch "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
+CURRENT_USER=$(whoami)
+RUN_CMD="sudo"
+if [ "$CURRENT_USER" = "root" ]; then
+  RUN_CMD=""
+fi
+
+run_cmd() {
+  if [ -z "$RUN_CMD" ]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 NOW_TS=$(date '+%Y-%m-%d %H:%M:%S')
 echo "=== ✅ Starting deploy at $NOW_TS ==="
 echo "🧩 Node version: $(node -v)"
@@ -20,8 +34,8 @@ echo "🧩 NPM version: $(npm -v)"
 
 if [ ! -w "$PROJECT_DIR" ]; then
   echo "⚠️ Нет прав на запись в $PROJECT_DIR, пытаюсь поправить..."
-  sudo chown -R $(whoami):www-data "$PROJECT_DIR" || echo "⚠️ Не удалось изменить владельца (нужно sudo)"
-  sudo chmod -R 775 "$PROJECT_DIR" || echo "⚠️ Не удалось изменить права (нужно sudo)"
+  run_cmd chown -R $(whoami):www-data "$PROJECT_DIR" || echo "⚠️ Не удалось изменить владельца (нужно sudo)"
+  run_cmd chmod -R 775 "$PROJECT_DIR" || echo "⚠️ Не удалось изменить права (нужно sudo)"
 fi
 
 echo "📦 Backing up environment files..."
@@ -38,8 +52,8 @@ git reset --hard "origin/$BRANCH" || { echo "❌ Git reset failed"; exit 1; }
 echo "🔧 Installing frontend dependencies..."
 if ! npm ci --no-audit --no-fund; then
   echo "⚠️ npm ci failed, trying to fix permissions..."
-  sudo chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
-  sudo chmod -R 775 node_modules package-lock.json 2>/dev/null || true
+  run_cmd chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
+  run_cmd chmod -R 775 node_modules package-lock.json 2>/dev/null || true
   npm ci --no-audit --no-fund || { echo "❌ npm install окончательно упал"; exit 1; }
 fi
 
@@ -57,14 +71,14 @@ echo "🛠️ Updating backend dependencies..."
 cd "$BACKEND_DIR"
 if ! npm ci --no-audit --no-fund; then
   echo "⚠️ Backend npm ci failed, trying to fix permissions..."
-  sudo chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
-  sudo chmod -R 775 node_modules package-lock.json 2>/dev/null || true
+  run_cmd chown -R $(whoami):www-data node_modules package-lock.json 2>/dev/null || true
+  run_cmd chmod -R 775 node_modules package-lock.json 2>/dev/null || true
   npm ci --no-audit --no-fund || { echo "❌ Backend npm install окончательно упал"; exit 1; }
 fi
 
 cd "$PROJECT_DIR"
 echo "🔁 Restarting backend service..."
-if sudo systemctl restart "$SERVICE_NAME"; then
+if ${RUN_CMD:-} systemctl restart "$SERVICE_NAME"; then
   echo "✅ Сервис $SERVICE_NAME успешно перезапущен"
 else
   echo "❌ Не удалось перезапустить $SERVICE_NAME, смотрите systemctl status" >&2
@@ -72,8 +86,8 @@ else
 fi
 
 echo "🌐 Reloading Nginx..."
-if sudo nginx -t; then
-  sudo systemctl reload nginx || echo "⚠️ Не удалось перезагрузить Nginx" >&2
+if ${RUN_CMD:-} nginx -t; then
+  ${RUN_CMD:-} systemctl reload nginx || echo "⚠️ Не удалось перезагрузить Nginx" >&2
   echo "✅ Nginx конфигурация применена"
 else
   echo "❌ nginx configuration test failed" >&2
