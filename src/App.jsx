@@ -38,6 +38,9 @@ import RoutesGuide from "./pages/vpn/RoutesGuide.jsx";
 import VPNIndex from "./pages/vpn/Index.jsx";
 import OutlineGuide from "./pages/vpn/OutlineGuide.jsx";
 import DebugDnd from "./pages/DebugDnd.jsx";
+import PlantsList from "./pages/plants/PlantsList.jsx";
+import PlantDetail from "./pages/plants/PlantDetail.jsx";
+import PlantSettings from "./pages/plants/PlantSettings.jsx";
 import { useEffect } from "react";
 import { registerPush } from "./push/registerPush.js";
 
@@ -165,6 +168,7 @@ function AppRoutes() {
                 const allowVPN = can('view_vpn') || user?.vpnCanCreate;
                 const allowAccountingAdmin = can('accounting:admin');
                 const allowAccountingEdit = allowAccountingAdmin || can('accounting:edit');
+                const allowPlantsAdmin = can('plants_admin');
                 const allowAccounting =
                   allowAccountingEdit || can('accounting:view') || perms.size === 0;
                 return (
@@ -199,6 +203,34 @@ function AppRoutes() {
                         ) : (
                           <NotFound />
                         )
+                      }
+                    />
+                    <Route
+                      path="/plants"
+                      element={
+                        <RouteTransition>
+                          <PlantsList />
+                        </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/plants/settings"
+                      element={
+                        allowPlantsAdmin ? (
+                          <RouteTransition>
+                            <PlantSettings />
+                          </RouteTransition>
+                        ) : (
+                          <NotFound />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/plants/:slug"
+                      element={
+                        <RouteTransition>
+                          <PlantDetail />
+                        </RouteTransition>
                       }
                     />
                     <Route

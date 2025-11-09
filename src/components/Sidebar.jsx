@@ -71,6 +71,24 @@ const NAV = [
     ),
   },
   {
+    id: "plants",
+    path: "/plants",
+    label: "Растения",
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22V11" />
+        <path d="M12 11c-4.5 0-7-3-7-7 4 0 7 2.5 7 7Z" />
+        <path d="M12 11c0-4.5 3-7 7-7 0 4-2.5 7-7 7Z" />
+        <path d="M12 22c0-4 2-7 5-9" />
+        <path d="M12 22c0-3-2-6-5-8" />
+      </svg>
+    ),
+    children: [
+      { id: "plants-list", path: "/plants", label: "Список растений" },
+      { id: "plants-settings", path: "/plants/settings", label: "Настройки", perm: "plants_admin" },
+    ],
+  },
+  {
     id: "accounting",
     label: "Финансы",
     icon: (
@@ -153,6 +171,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
     vpn: location.pathname.startsWith("/vpn"),
     admin: location.pathname.startsWith("/admin"),
     accounting: location.pathname.startsWith("/accounting"),
+    plants: location.pathname.startsWith("/plants"),
   });
 
   const role = user?.role || "NON_ADMIN";
@@ -179,6 +198,9 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
           if (child.id === "accounting-settings") return hasPerm("accounting:admin");
           return hasPerm("accounting:edit");
         });
+        if (childrenList.length === 0) return null;
+      } else {
+        childrenList = childrenList.filter((child) => !child.perm || hasPerm(child.perm));
         if (childrenList.length === 0) return null;
       }
       const isOpen = !isCollapsed && expanded[item.id];

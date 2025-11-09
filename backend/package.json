@@ -5,9 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "seed:plants": "node scripts/seedPlants.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.927.0",
+    "@aws-sdk/lib-storage": "^3.927.0",
     "@grpc/grpc-js": "^1.11.1",
     "@grpc/proto-loader": "^0.7.10",
     "bcrypt": "^5.1.1",
@@ -15,9 +18,11 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
     "node-cron": "^3.0.3",
     "pg": "^8.11.3",
     "sanitize-html": "^2.17.0",
+    "sharp": "^0.34.5",
     "undici": "^6.19.8",
     "uuid": "^9.0.1",
     "web-push": "^3.6.6"

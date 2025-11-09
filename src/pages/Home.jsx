@@ -75,7 +75,40 @@ const quickLinks = [
   },
 ];
 
-export default function Home() {
+const plantsLink = {
+  to: "/plants",
+  title: "Растения",
+  description: "Каталог, карточки, фильтры и галерея коллекции",
+  badge: "Коллекция",
+  iconBg: "bg-emerald-500/10 text-emerald-500 dark:bg-emerald-400/10 dark:text-emerald-300",
+  glow: "bg-emerald-500/20",
+  icon: (
+    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22V11" />
+      <path d="M12 11C7 11 4 7.5 4 4c4 0 8 3 8 7Z" />
+      <path d="M12 11c0-4 4-7 8-7 0 3.5-3 7-8 7Z" />
+      <path d="M12 22c0-3 2-6 5-8" />
+      <path d="M12 22c0-3-2-6-5-8" />
+    </svg>
+  ),
+};
+
+const financeLink = {
+  to: "/accounting",
+  title: "Финансы",
+  description: "Дашборд, платежи, транзакции и прогнозы",
+  badge: "Финансы",
+  iconBg: "bg-fuchsia-500/10 text-fuchsia-500 dark:bg-fuchsia-400/10 dark:text-fuchsia-300",
+  glow: "bg-fuchsia-500/20",
+  icon: (
+    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <path d="M3 9h18" />
+    </svg>
+  ),
+};
+function Home() {
   const { user } = useAuth();
   const accountingAvailable = React.useMemo(() => {
     if (!user) return false;
@@ -84,25 +117,11 @@ export default function Home() {
     return perms.has("accounting:view") || perms.has("accounting:edit") || perms.has("accounting:admin");
   }, [user]);
   const links = React.useMemo(() => {
-    if (!accountingAvailable) return quickLinks;
-    return [
-      ...quickLinks,
-      {
-        to: "/accounting",
-        title: "Финансы",
-        description: "Дашборд, платежи, транзакции и прогнозы",
-        badge: "Финансы",
-        iconBg: "bg-fuchsia-500/10 text-fuchsia-500 dark:bg-fuchsia-400/10 dark:text-fuchsia-300",
-        glow: "bg-fuchsia-500/20",
-        icon: (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M9 3v18" />
-            <path d="M3 9h18" />
-          </svg>
-        ),
-      },
-    ];
+    const base = [...quickLinks, plantsLink];
+    if (accountingAvailable) {
+      base.push(financeLink);
+    }
+    return base;
   }, [accountingAvailable]);
 
   return (
@@ -167,3 +186,6 @@ export default function Home() {
     </PageShell>
   );
 }
+
+export default Home;
+

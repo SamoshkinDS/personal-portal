@@ -37,7 +37,7 @@ export default function AccountingDashboard() {
   const accountsSummary = data?.accounts_summary;
 
   return (
-    <PageShell title="Бухгалтерия — дашборд">
+    <PageShell title="Финансы — дашборд">
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">

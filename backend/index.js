@@ -16,7 +16,9 @@ import actionsRoutes from "./routes/actions.js";
 import n8nRoutes from "./routes/n8n.js";
 import notesRoutes from "./routes/notes.js";
 import accountingRoutes from "./routes/accounting.js";
+import plantsRoutes from "./routes/plants.js";
 import { pool } from "./db/connect.js";
+import { ensurePlantsSchema } from "./db/plantsSchema.js";
 import { syncVlessStats } from "./services/xray.js";
 import {
   createUtilityPlaceholders,
@@ -50,6 +52,7 @@ app.use("/api/actions", actionsRoutes);
 app.use("/api/n8n", n8nRoutes);
 app.use("/api/notes", notesRoutes);
 app.use("/api/accounting", accountingRoutes);
+app.use("/api/plants", plantsRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
 const ACCOUNTING_JOBS_ENABLED = String(process.env.ACCOUNTING_JOBS_DISABLED || "false").toLowerCase() !== "true";
@@ -204,6 +207,7 @@ if (ACCOUNTING_JOBS_ENABLED) {
         ('view_logs','РџСЂРѕСЃРјРѕС‚СЂ Р»РѕРіРѕРІ'),
         ('manage_content','РЈРїСЂР°РІР»РµРЅРёРµ РєРѕРЅС‚РµРЅС‚РѕРј'),
         ('vpn_create','РЎРѕР·РґР°РЅРёРµ VPN-РєР»СЋС‡РµР№'),
+        ('plants_admin','Управление разделом «Растения»'),
         ('accounting:view','Р‘СѓС…РіР°Р»С‚РµСЂРёСЏ: РїСЂРѕСЃРјРѕС‚СЂ'),
         ('accounting:edit','Р‘СѓС…РіР°Р»С‚РµСЂРёСЏ: СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ'),
         ('accounting:admin','Р‘СѓС…РіР°Р»С‚РµСЂРёСЏ: РЅР°СЃС‚СЂРѕР№РєРё')
@@ -463,7 +467,8 @@ if (ACCOUNTING_JOBS_ENABLED) {
       SELECT id FROM users
       ON CONFLICT (user_id) DO NOTHING;
     `);
-    console.log("DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences");
+    await ensurePlantsSchema();
+    console.log("DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, plants");
   } catch (err) {
     console.error("DB init error", err);
   }
