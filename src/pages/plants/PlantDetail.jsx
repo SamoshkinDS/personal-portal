@@ -10,6 +10,7 @@ import Modal from "../../components/Modal.jsx";
 import { plantsApi } from "../../api/plants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
+import PlantProblemsSection from "../../components/plants/PlantProblemsSection.jsx";
 
 const EMPTY_DOC = { type: "doc", content: [] };
 const MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -296,6 +297,8 @@ export default function PlantDetail() {
               onGenerate={handleArticleGenerate}
               generating={generatingArticle}
             />
+
+            {canManage && <PlantProblemsSection plantId={plant.id} canManage={canManage} />}
 
             {similar.length > 0 && <SimilarPlants items={similar} />}
 

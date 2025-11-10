@@ -853,6 +853,100 @@ router.delete("/:id", requirePermission("plants_admin"), async (req, res) => {
   }
 });
 
+router.get("/:id/problems", requirePermission("plants_admin"), async (req, res) => {
+  try {
+    const plantId = await resolvePlantId(req.params.id);
+    if (!plantId) return res.status(404).json({ message: "Plant not found" });
+    const problems = await fetchPlantProblems(plantId);
+    res.json(problems);
+  } catch (error) {
+    console.error("GET /api/plants/:id/problems", error);
+    return respondError(res, error, "Failed to load plant problems");
+  }
+});
+
+router.post("/:id/pests", requirePermission("plants_admin"), async (req, res) => {
+  try {
+    const plantId = await resolvePlantId(req.params.id);
+    if (!plantId) return res.status(404).json({ message: "Plant not found" });
+    const ids = parseIntArray(req.body?.ids);
+    if (!ids.length) {
+      return res.status(400).json({ message: "ids array is required" });
+    }
+    await ensureProblemEntitiesExist("pests", ids);
+    await insertPlantRelations("plant_pest", "pest_id", plantId, ids, req.user?.id);
+    const problems = await fetchPlantProblems(plantId);
+    res.json(problems);
+  } catch (error) {
+    console.error("POST /api/plants/:id/pests", error);
+    return respondError(res, error, "Failed to attach pests");
+  }
+});
+
+router.post("/:id/diseases", requirePermission("plants_admin"), async (req, res) => {
+  try {
+    const plantId = await resolvePlantId(req.params.id);
+    if (!plantId) return res.status(404).json({ message: "Plant not found" });
+    const ids = parseIntArray(req.body?.ids);
+    if (!ids.length) {
+      return res.status(400).json({ message: "ids array is required" });
+    }
+    await ensureProblemEntitiesExist("diseases", ids);
+    await insertPlantRelations("plant_disease", "disease_id", plantId, ids, req.user?.id);
+    const problems = await fetchPlantProblems(plantId);
+    res.json(problems);
+  } catch (error) {
+    console.error("POST /api/plants/:id/diseases", error);
+    return respondError(res, error, "Failed to attach diseases");
+  }
+});
+
+router.delete("/:id/pests/:pestId", requirePermission("plants_admin"), async (req, res) => {
+  try {
+    const plantId = await resolvePlantId(req.params.id);
+    if (!plantId) return res.status(404).json({ message: "Plant not found" });
+    const pestId = Number(req.params.pestId);
+    if (!Number.isFinite(pestId)) {
+      return res.status(400).json({ message: "Invalid pest id" });
+    }
+    const deleted = await pool.query(
+      "DELETE FROM plant_pest WHERE plant_id = $1 AND pest_id = $2 RETURNING pest_id",
+      [plantId, pestId]
+    );
+    if (!deleted.rows.length) {
+      return res.status(404).json({ message: "Relation not found" });
+    }
+    const problems = await fetchPlantProblems(plantId);
+    res.json(problems);
+  } catch (error) {
+    console.error("DELETE /api/plants/:id/pests/:pestId", error);
+    return respondError(res, error, "Failed to detach pest");
+  }
+});
+
+router.delete("/:id/diseases/:diseaseId", requirePermission("plants_admin"), async (req, res) => {
+  try {
+    const plantId = await resolvePlantId(req.params.id);
+    if (!plantId) return res.status(404).json({ message: "Plant not found" });
+    const diseaseId = Number(req.params.diseaseId);
+    if (!Number.isFinite(diseaseId)) {
+      return res.status(400).json({ message: "Invalid disease id" });
+    }
+    const deleted = await pool.query(
+      "DELETE FROM plant_disease WHERE plant_id = $1 AND disease_id = $2 RETURNING disease_id",
+      [plantId, diseaseId]
+    );
+    if (!deleted.rows.length) {
+      return res.status(404).json({ message: "Relation not found" });
+    }
+    const problems = await fetchPlantProblems(plantId);
+    res.json(problems);
+  } catch (error) {
+    console.error("DELETE /api/plants/:id/diseases/:diseaseId", error);
+    return respondError(res, error, "Failed to detach disease");
+  }
+});
+
 router.get("/:identifier", async (req, res) => {
   try {
     const identifier = req.params.identifier;
@@ -1202,6 +1296,71 @@ async function upsertPlantTags(plantId, tagIds, tagNames) {
   const params = [plantId, ...ids];
   await pool.query(
     `INSERT INTO plant_tag_map (plant_id, tag_id) VALUES ${values.join(", ")}`,
+    params
+  );
+}
+
+async function fetchPlantProblems(plantId) {
+  const [pests, diseases] = await Promise.all([
+    pool.query(
+      `SELECT p.id, p.slug, p.name, p.danger_level, p.symptoms, p.description
+       FROM plant_pest pp
+       JOIN pests p ON p.id = pp.pest_id
+       WHERE pp.plant_id = $1
+       ORDER BY LOWER(p.name)`,
+      [plantId]
+    ),
+    pool.query(
+      `SELECT d.id, d.slug, d.name, d.disease_type, d.symptoms, d.description, d.reason
+       FROM plant_disease pd
+       JOIN diseases d ON d.id = pd.disease_id
+       WHERE pd.plant_id = $1
+       ORDER BY LOWER(d.name)`,
+      [plantId]
+    ),
+  ]);
+  return {
+    pests: pests.rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      danger_level: row.danger_level,
+      symptoms: row.symptoms,
+      description: row.description,
+    })),
+    diseases: diseases.rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      disease_type: row.disease_type,
+      symptoms: row.symptoms,
+      description: row.description,
+      reason: row.reason,
+    })),
+    medicines: [],
+  };
+}
+
+async function ensureProblemEntitiesExist(table, ids) {
+  if (!ids?.length) return;
+  const existing = await pool.query(`SELECT id FROM ${table} WHERE id = ANY($1)`, [ids]);
+  const found = new Set(existing.rows.map((row) => row.id));
+  const missing = ids.filter((id) => !found.has(id));
+  if (missing.length) {
+    throw validationError(`Some ${table} ids not found: ${missing.join(", ")}`);
+  }
+}
+
+async function insertPlantRelations(table, column, plantId, ids, userId) {
+  if (!ids?.length) return;
+  const values = ids
+    .map((_, idx) => `($1, $${idx + 2}, $${ids.length + 2})`)
+    .join(", ");
+  const params = [plantId, ...ids, userId || null];
+  await pool.query(
+    `INSERT INTO ${table} (plant_id, ${column}, created_by)
+     VALUES ${values}
+     ON CONFLICT DO NOTHING`,
     params
   );
 }

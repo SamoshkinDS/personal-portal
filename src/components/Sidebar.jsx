@@ -85,6 +85,50 @@ const NAV = [
     ),
     children: [
       { id: "plants-list", path: "/plants", label: "Список растений" },
+      {
+        id: "plants-pests",
+        path: "/pests",
+        label: "Вредители",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v4" />
+            <path d="M12 18v4" />
+            <path d="m4.93 4.93 2.83 2.83" />
+            <path d="m16.24 16.24 2.83 2.83" />
+            <path d="M2 12h4" />
+            <path d="M18 12h4" />
+            <path d="m4.93 19.07 2.83-2.83" />
+            <path d="m16.24 7.76 2.83-2.83" />
+          </svg>
+        ),
+      },
+      {
+        id: "plants-diseases",
+        path: "/diseases",
+        label: "Заболевания",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-9-9" />
+            <path d="m22 2-5 5" />
+            <path d="M14 8h.01" />
+            <path d="M9 13h.01" />
+            <path d="M13 16h.01" />
+          </svg>
+        ),
+      },
+      {
+        id: "plants-medicines",
+        path: "/medicines",
+        label: "Лекарства",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="18" rx="3.5" />
+            <rect x="14" y="3" width="7" height="18" rx="3.5" />
+            <path d="M7 8h9" />
+          </svg>
+        ),
+      },
       { id: "plants-settings", path: "/plants/settings", label: "Настройки", perm: "plants_admin" },
     ],
   },

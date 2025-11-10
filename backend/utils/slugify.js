@@ -82,3 +82,27 @@ export async function ensureUniquePlantSlug({ englishName, latinName, commonName
     slug = `${base}-${attempt}`;
   }
 }
+
+export async function ensureUniqueSlugForTable(tableName, sourceValue, { fallbackPrefix, existingId } = {}) {
+  const baseSource = sourceValue || fallbackPrefix || tableName || "item";
+  let base = slugifyText(baseSource);
+  if (!base) {
+    base = slugifyText(fallbackPrefix || "item") || `item-${Date.now()}`;
+  }
+  let slug = base;
+  let attempt = 1;
+  while (true) {
+    const params = [slug];
+    let query = `SELECT id FROM ${tableName} WHERE slug = $1`;
+    if (existingId) {
+      params.push(existingId);
+      query += " AND id <> $2";
+    }
+    const existing = await pool.query(query, params);
+    if (existing.rows.length === 0) {
+      return slug;
+    }
+    attempt += 1;
+    slug = `${base}-${attempt}`;
+  }
+}

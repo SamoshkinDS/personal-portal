@@ -50,6 +50,7 @@ export default function PlantArticleEditor({
   initialMarkdown = "",
   onSave,
   loading,
+  modalTitle = "Статья о растении",
 }) {
   const [activeTab, setActiveTab] = React.useState("visual");
   const [markdownValue, setMarkdownValue] = React.useState(initialMarkdown || "");
@@ -98,7 +99,7 @@ export default function PlantArticleEditor({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Статья о растении" maxWidth="max-w-5xl">
+    <Modal open={open} onClose={onClose} title={modalTitle} maxWidth="max-w-5xl">
       <form onSubmit={handleSubmit} className="space-y-4 text-slate-900 dark:text-slate-100">
         <div className="flex gap-2">
           {["visual", "markdown"].map((tab) => (

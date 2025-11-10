@@ -204,6 +204,26 @@ export async function ensurePlantsSchema() {
       PRIMARY KEY (plant_id, tag_id)
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS plant_pest (
+      plant_id INT REFERENCES plants(id) ON DELETE CASCADE,
+      pest_id INT REFERENCES pests(id) ON DELETE CASCADE,
+      created_by INT,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (plant_id, pest_id)
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS plant_disease (
+      plant_id INT REFERENCES plants(id) ON DELETE CASCADE,
+      disease_id INT REFERENCES diseases(id) ON DELETE CASCADE,
+      created_by INT,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (plant_id, disease_id)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_plant_pest_pest_id ON plant_pest(pest_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_plant_disease_disease_id ON plant_disease(disease_id);`);
 
   await pool.query(`
     DO $$

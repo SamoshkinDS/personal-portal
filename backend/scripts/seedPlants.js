@@ -1,6 +1,8 @@
 import process from "process";
 import { pool } from "../db/connect.js";
-import { ensureUniquePlantSlug } from "../utils/slugify.js";
+import { ensureUniquePlantSlug, ensureUniqueSlugForTable } from "../utils/slugify.js";
+import { ensureCareCatalogSchema } from "../db/careSchema.js";
+import { ensurePlantsSchema } from "../db/plantsSchema.js";
 
 const SAMPLE_PLANTS = [
   {
@@ -93,11 +95,110 @@ const SAMPLE_PLANTS = [
     bloom: null,
     maxHeight: 120,
   },
+  {
+    common: "Спатифиллум сенсация",
+    latin: "Spathiphyllum floribundum",
+    english: "Peace lily Sensation",
+    family: "Ароидные",
+    origin: "Латинская Америка",
+    bloom: 5,
+    maxHeight: 90,
+    problems: {
+      pests: ["Паутинный клещ", "Щитовка"],
+      disease: "Корневая гниль",
+    },
+  },
+  {
+    common: "Калатея Макояна",
+    latin: "Calathea makoyana",
+    english: "Peacock plant",
+    family: "Марантовые",
+    origin: "Бразилия",
+    bloom: null,
+    maxHeight: 60,
+    problems: {
+      pests: ["Мучнистый червец", "Паутинный клещ"],
+      disease: "Хлороз",
+    },
+  },
+  {
+    common: "Лавр комнатный",
+    latin: "Laurus nobilis",
+    english: "Bay laurel",
+    family: "Лавровые",
+    origin: "Средиземноморье",
+    bloom: 4,
+    maxHeight: 150,
+    problems: {
+      pests: ["Трипсы", "Щитовка"],
+      disease: "Мучнистая роса",
+    },
+  },
+];
+
+const SAMPLE_PESTS = [
+  {
+    name: "Паутинный клещ",
+    description: "Мелкие паучки, окутывающие побеги тонкой паутиной и высасывающие соки.",
+    danger_level: "medium",
+    symptoms: "Тонкая паутина и светлые точки на листьях",
+    active_period: "Весна-лето",
+  },
+  {
+    name: "Трипсы",
+    description: "Миниатюрные насекомые, оставляющие серебристые штрихи и точки.",
+    danger_level: "high",
+    symptoms: "Серебристые полосы и коричневые штрихи на пластинах",
+    active_period: "Круглый год при тёплом воздухе",
+  },
+  {
+    name: "Щитовка",
+    description: "Насекомые в плотной «скорлупе», покрывающие стебли и листья.",
+    danger_level: "medium",
+    symptoms: "Липкий налёт и коричневые бляшки на листьях",
+    active_period: "Зима и межсезонье",
+  },
+  {
+    name: "Мучнистый червец",
+    description: "Белые пушистые комочки в пазухах и на корнях.",
+    danger_level: "medium",
+    symptoms: "Белый налёт, деформация новых побегов",
+    active_period: "Осень-зима при сухом воздухе",
+  },
+];
+
+const SAMPLE_DISEASES = [
+  {
+    name: "Корневая гниль",
+    disease_type: "грибковое",
+    reason: "Перелив и застой влаги",
+    symptoms: "Вялые листья, запах сырости от субстрата",
+    description: "Гниение корневой системы из-за переувлажнения и плохого дренажа.",
+    prevention: "Пролив по графику, лёгкий грунт и обязательный дренаж.",
+  },
+  {
+    name: "Мучнистая роса",
+    disease_type: "грибковое",
+    reason: "Холодный влажный воздух",
+    symptoms: "Белый мучнистый налёт на листьях",
+    description: "Грибок быстро распространяется по пластине и тормозит рост растения.",
+    prevention: "Проветривание, умеренный полив, профилактические фунгициды.",
+  },
+  {
+    name: "Хлороз",
+    disease_type: "неинфекционное",
+    reason: "Дефицит железа и жёсткая вода",
+    symptoms: "Жёлтые листья с зелёными прожилками",
+    description: "Нарушение фотосинтеза из-за нехватки микроэлементов.",
+    prevention: "Использование мягкой воды и подкормок с хелатами железа.",
+  },
 ];
 
 const TAG_PRESETS = ["СЃСѓРєРєСѓР»РµРЅС‚", "С†РІРµС‚СѓС‰РёР№", "С‚РµРЅРµР»СЋР±РёРІС‹Р№"];
 
 async function main() {
+  await ensureCareCatalogSchema();
+  await ensurePlantsSchema();
   const force = process.argv.includes("--force");
   const count = await pool.query("SELECT COUNT(*)::int AS count FROM plants");
   if (count.rows[0].count > 0 && !force) {
@@ -108,6 +209,7 @@ async function main() {
 
   const dicts = await loadDictionaries();
   const tagMap = await ensureTags(TAG_PRESETS);
+  const careRefs = await ensureCareSamples();
 
   for (const sample of SAMPLE_PLANTS) {
     const slug = await ensureUniquePlantSlug({
@@ -155,6 +257,9 @@ async function main() {
     );
     if (!inserted.rows.length) continue;
     const plantId = inserted.rows[0].id;
+    if (sample.problems) {
+      await linkProblemsToPlant(plantId, sample.problems, careRefs);
+    }
     const tagValues = shuffle([...tagMap.values()]).slice(0, 2);
     for (const tagId of tagValues) {
       await pool.query(
@@ -166,6 +271,74 @@ async function main() {
 
   console.log("Seeded demo plants");
   await pool.end();
+}
+
+async function ensureCareSamples() {
+  const pests = new Map();
+  for (const entry of SAMPLE_PESTS) {
+    const slug = await ensureUniqueSlugForTable("pests", entry.name, { fallbackPrefix: "pest" });
+    const q = await pool.query(
+      `INSERT INTO pests (slug, name, description, danger_level, symptoms, active_period)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (slug) DO UPDATE SET
+         description = EXCLUDED.description,
+         danger_level = EXCLUDED.danger_level,
+         symptoms = EXCLUDED.symptoms,
+         active_period = EXCLUDED.active_period
+       RETURNING id`,
+      [slug, entry.name, entry.description, entry.danger_level, entry.symptoms, entry.active_period]
+    );
+    pests.set(entry.name, q.rows[0].id);
+  }
+  const diseases = new Map();
+  for (const entry of SAMPLE_DISEASES) {
+    const slug = await ensureUniqueSlugForTable("diseases", entry.name, { fallbackPrefix: "disease" });
+    const q = await pool.query(
+      `INSERT INTO diseases (slug, name, description, disease_type, reason, symptoms, prevention)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (slug) DO UPDATE SET
+         description = EXCLUDED.description,
+         disease_type = EXCLUDED.disease_type,
+         reason = EXCLUDED.reason,
+         symptoms = EXCLUDED.symptoms,
+         prevention = EXCLUDED.prevention
+       RETURNING id`,
+      [slug, entry.name, entry.description, entry.disease_type, entry.reason, entry.symptoms, entry.prevention]
+    );
+    diseases.set(entry.name, q.rows[0].id);
+  }
+  return { pests, diseases };
+}
+
+async function linkProblemsToPlant(plantId, problems, references) {
+  if (!problems) return;
+  if (Array.isArray(problems.pests) && problems.pests.length) {
+    const pestIds = problems.pests
+      .map((name) => references.pests.get(name))
+      .filter(Boolean);
+    if (pestIds.length) {
+      const values = pestIds.map((_, idx) => `($1, $${idx + 2}, NULL)`).join(", ");
+      await pool.query(
+        `INSERT INTO plant_pest (plant_id, pest_id, created_by) VALUES ${values} ON CONFLICT DO NOTHING`,
+        [plantId, ...pestIds]
+      );
+    }
+  }
+  const diseaseList = Array.isArray(problems.diseases)
+    ? problems.diseases
+    : problems.disease
+    ? [problems.disease]
+    : [];
+  if (diseaseList.length) {
+    const diseaseIds = diseaseList.map((name) => references.diseases.get(name)).filter(Boolean);
+    if (diseaseIds.length) {
+      const values = diseaseIds.map((_, idx) => `($1, $${idx + 2}, NULL)`).join(", ");
+      await pool.query(
+        `INSERT INTO plant_disease (plant_id, disease_id, created_by) VALUES ${values} ON CONFLICT DO NOTHING`,
+        [plantId, ...diseaseIds]
+      );
+    }
+  }
 }
 
 async function loadDictionaries() {
@@ -219,3 +392,5 @@ main().catch((err) => {
   console.error("Seed plants failed", err);
   process.exitCode = 1;
 });
+
+

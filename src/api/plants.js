@@ -118,6 +118,34 @@ export const plantsApi = {
     });
     return jsonOrThrow(res, "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ Р·Р°РїСЂРѕСЃ РІ n8n");
   },
+  async getProblems(id) {
+    const res = await apiAuthFetch(`/api/plants/${id}/problems`);
+    return jsonOrThrow(res, "Не удалось загрузить связанные проблемы");
+  },
+  async addPests(id, ids = []) {
+    const res = await apiAuthFetch(`/api/plants/${id}/pests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    return jsonOrThrow(res, "Не удалось добавить вредителей");
+  },
+  async addDiseases(id, ids = []) {
+    const res = await apiAuthFetch(`/api/plants/${id}/diseases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    return jsonOrThrow(res, "Не удалось добавить заболевания");
+  },
+  async removePest(id, pestId) {
+    const res = await apiAuthFetch(`/api/plants/${id}/pests/${pestId}`, { method: "DELETE" });
+    return jsonOrThrow(res, "Не удалось удалить связь с вредителем");
+  },
+  async removeDisease(id, diseaseId) {
+    const res = await apiAuthFetch(`/api/plants/${id}/diseases/${diseaseId}`, { method: "DELETE" });
+    return jsonOrThrow(res, "Не удалось удалить связь с заболеванием");
+  },
   async clone(id) {
     const res = await apiAuthFetch(`/api/plants/${id}/clone`, { method: "POST" });
     return jsonOrThrow(res, "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РєРѕРїРёСЋ СЂР°СЃС‚РµРЅРёСЏ");

@@ -41,6 +41,12 @@ import DebugDnd from "./pages/DebugDnd.jsx";
 import PlantsList from "./pages/plants/PlantsList.jsx";
 import PlantDetail from "./pages/plants/PlantDetail.jsx";
 import PlantSettings from "./pages/plants/PlantSettings.jsx";
+import PestsList from "./pages/care/PestsList.jsx";
+import PestDetail from "./pages/care/PestDetail.jsx";
+import DiseasesList from "./pages/care/DiseasesList.jsx";
+import DiseaseDetail from "./pages/care/DiseaseDetail.jsx";
+import MedicinesList from "./pages/care/MedicinesList.jsx";
+import MedicineDetail from "./pages/care/MedicineDetail.jsx";
 import { useEffect } from "react";
 import { registerPush } from "./push/registerPush.js";
 
@@ -230,6 +236,54 @@ function AppRoutes() {
                       element={
                         <RouteTransition>
                           <PlantDetail />
+                        </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/pests"
+                      element={
+                        <RouteTransition>
+                          <PestsList />
+                        </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/pests/:slug"
+                      element={
+                        <RouteTransition>
+                          <PestDetail />
+                        </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/diseases"
+                      element={
+                        <RouteTransition>
+                          <DiseasesList />
+                        </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/diseases/:slug"
+                      element={
+                        <RouteTransition>
+                          <DiseaseDetail />
+                        </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/medicines"
+                      element={
+                        <RouteTransition>
+                          <MedicinesList />
+                        </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/medicines/:slug"
+                      element={
+                        <RouteTransition>
+                          <MedicineDetail />
                         </RouteTransition>
                       }
                     />
