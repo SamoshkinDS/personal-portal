@@ -1,7 +1,10 @@
 ﻿import React from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { generateHTML } from "@tiptap/html";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import PageShell from "../../components/PageShell.jsx";
 import Modal from "../../components/Modal.jsx";
 import { plantsApi } from "../../api/plants.js";
@@ -15,12 +18,15 @@ const TOX_LEVELS = ["нет", "низкая", "средняя", "высокая"
 export default function PlantDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const canManage = user?.role === "ALL" || (user?.permissions || []).includes("plants_admin");
 
   const [plant, setPlant] = React.useState(null);
   const [gallery, setGallery] = React.useState([]);
   const [article, setArticle] = React.useState(null);
+  const [similar, setSimilar] = React.useState([]);
+  const [idealNeighbors, setIdealNeighbors] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
 
@@ -32,6 +38,9 @@ export default function PlantDetail() {
   const [editOpen, setEditOpen] = React.useState(false);
   const [articleEditorOpen, setArticleEditorOpen] = React.useState(false);
   const [articleSaving, setArticleSaving] = React.useState(false);
+  const [generatingArticle, setGeneratingArticle] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const [imageVersion, setImageVersion] = React.useState(0);
 
   const applyPlantPayload = React.useCallback((data) => {
@@ -39,6 +48,8 @@ export default function PlantDetail() {
     setPlant(data.plant);
     setGallery(data.gallery || []);
     setArticle(data.article || null);
+    setSimilar(data.similar || []);
+    setIdealNeighbors(data.ideal_neighbors || []);
   }, []);
 
   const refreshPlant = React.useCallback(async () => {
@@ -95,6 +106,15 @@ export default function PlantDetail() {
     };
   }, [slug, navigate, applyPlantPayload]);
 
+  React.useEffect(() => {
+    if (searchParams.get("edit") === "1" && plant) {
+      setEditOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("edit");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams, plant]);
+
   const handleMainUpload = async (file) => {
     if (!plant || !file) return;
     try {
@@ -135,6 +155,20 @@ export default function PlantDetail() {
     }
   };
 
+  const handleGalleryReorder = async (orderedIds) => {
+    if (!plant || !orderedIds?.length) return;
+    const currentMap = new Map(gallery.map((item) => [item.id, item]));
+    const reordered = orderedIds.map((id) => currentMap.get(id)).filter(Boolean);
+    setGallery(reordered);
+    try {
+      await plantsApi.reorderGallery(plant.id, orderedIds);
+      toast.success("Порядок сохранён");
+    } catch (err) {
+      toast.error(err.message || "Не удалось изменить порядок");
+      await refreshPlant();
+    }
+  };
+
   const handleArticleSave = async (payload) => {
     if (!plant) return;
     try {
@@ -150,6 +184,34 @@ export default function PlantDetail() {
     }
   };
 
+  const handleArticleGenerate = async () => {
+    if (!plant) return;
+    try {
+      setGeneratingArticle(true);
+      await plantsApi.triggerArticleGeneration(plant.id);
+      toast.success("Запрос отправлен");
+    } catch (err) {
+      toast.error(err.message || "Не удалось отправить запрос");
+    } finally {
+      setGeneratingArticle(false);
+    }
+  };
+
+  const handleDeletePlant = async () => {
+    if (!plant) return;
+    try {
+      setDeleting(true);
+      await plantsApi.remove(plant.id);
+      toast.success("Растение удалено");
+      navigate("/plants");
+    } catch (err) {
+      toast.error(err.message || "Не удалось удалить растение");
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   const handlePlantUpdate = async (payload) => {
     if (!plant) return;
     try {
@@ -162,6 +224,17 @@ export default function PlantDetail() {
     }
   };
 
+  const handleCloneSimilar = async () => {
+    if (!plant) return;
+    try {
+      const res = await plantsApi.clone(plant.id);
+      toast.success("Создана копия растения");
+      navigate(`/plants/${res.plant.slug}?edit=1`);
+    } catch (err) {
+      toast.error(err.message || "Не удалось создать копию");
+    }
+  };
+
   const articleHtml = React.useMemo(() => {
     if (!article?.content_rich) return "";
     try {
@@ -171,6 +244,7 @@ export default function PlantDetail() {
       return article.content_text || "";
     }
   }, [article]);
+  const articleMarkdown = React.useMemo(() => (article?.content_text || "").trim(), [article]);
 
   return (
     <PageShell title={plant ? plant.common_name : "Карточка растения"} contentClassName="flex flex-col gap-6">
@@ -191,7 +265,14 @@ export default function PlantDetail() {
                 canManage={canManage}
                 cacheBuster={imageVersion}
               />
-              <PassportBlock plant={plant} canManage={canManage} onEdit={() => setEditOpen(true)} />
+              <PassportBlock
+                plant={plant}
+                canManage={canManage}
+                onEdit={() => setEditOpen(true)}
+                onClone={handleCloneSimilar}
+                onDeleteRequest={() => setDeleteDialogOpen(true)}
+                neighbors={idealNeighbors}
+              />
             </div>
 
             <TagsBlock tags={plant.tags || []} />
@@ -200,16 +281,23 @@ export default function PlantDetail() {
               images={gallery}
               onUpload={handleGalleryUpload}
               onDelete={handleGalleryDelete}
+              onReorder={handleGalleryReorder}
               uploading={uploadingGallery}
               canManage={canManage}
             />
 
             <ArticleSection
               html={articleHtml}
+              markdown={articleMarkdown}
               updatedAt={article?.updated_at}
               canManage={canManage}
               onEdit={() => setArticleEditorOpen(true)}
+              canGenerate={canManage && meta?.settings?.n8n_generate_description_enabled}
+              onGenerate={handleArticleGenerate}
+              generating={generatingArticle}
             />
+
+            {similar.length > 0 && <SimilarPlants items={similar} />}
 
             <EditPlantDialog
               open={editOpen}
@@ -224,9 +312,18 @@ export default function PlantDetail() {
             <PlantArticleEditor
               open={articleEditorOpen}
               initialContent={article?.content_rich || EMPTY_DOC}
+              initialMarkdown={article?.content_text || ""}
               onClose={() => setArticleEditorOpen(false)}
               onSave={handleArticleSave}
               loading={articleSaving}
+            />
+
+            <ConfirmDeleteDialog
+              open={deleteDialogOpen}
+              loading={deleting}
+              onCancel={() => setDeleteDialogOpen(false)}
+              onConfirm={handleDeletePlant}
+              plantName={plant.common_name}
             />
           </>
         )
@@ -276,7 +373,7 @@ function ImageBlock({ plant, onUploadMain, uploading, canManage, cacheBuster }) 
   );
 }
 
-function PassportBlock({ plant, canManage, onEdit }) {
+function PassportBlock({ plant, canManage, onEdit, onClone, onDeleteRequest, neighbors = [] }) {
   const rows = [
     { label: "Латинское", value: plant.latin_name },
     { label: "English", value: plant.english_name },
@@ -292,29 +389,75 @@ function PassportBlock({ plant, canManage, onEdit }) {
     { label: "Цветение", value: plant.blooming_month ? MONTHS[plant.blooming_month - 1] : null },
     { label: "Дата приобретения", value: formatDate(plant.acquisition_date) },
   ];
+  const careBadges = buildCareBadges(plant);
   return (
     <section className="space-y-4 rounded-3xl border border-slate-100 bg-white/90 p-5 shadow-sm dark:border-white/10 dark:bg-slate-900/60">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{plant.common_name}</h2>
           <p className="text-sm text-slate-500 dark:text-slate-300">Номер #{plant.id}</p>
+          <div className="mt-1 flex flex-wrap gap-2 text-xs">
+            {plant.category?.name && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+                🌿 {plant.category.name}
+              </span>
+            )}
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold ${
+                plant.is_published
+                  ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-200"
+                  : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200"
+              }`}
+            >
+              {plant.is_published ? "Опубликовано" : "Черновик"}
+            </span>
+          </div>
         </div>
         {canManage && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-blue-200 hover:text-blue-600 dark:border-white/10 dark:text-slate-200"
-          >
-            Редактировать
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {onClone && (
+              <button
+                type="button"
+                onClick={onClone}
+                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-emerald-200 hover:text-emerald-600 dark:border-white/10 dark:text-slate-200"
+              >
+                Добавить похожее
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-blue-200 hover:text-blue-600 dark:border-white/10 dark:text-slate-200"
+            >
+              Редактировать
+            </button>
+            {onDeleteRequest && (
+              <button
+                type="button"
+                onClick={onDeleteRequest}
+                className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:border-rose-300 hover:text-rose-700 dark:border-rose-400/40 dark:text-rose-200"
+              >
+                Удалить
+              </button>
+            )}
+          </div>
         )}
       </div>
+      {careBadges.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {careBadges.map((badge) => (
+            <CareBadge key={badge.label} icon={badge.icon} label={badge.label} value={badge.value} tone={badge.tone} />
+          ))}
+        </div>
+      )}
       <div className="grid gap-3 md:grid-cols-2">
         {rows.map((row) => (
           <InfoRow key={row.label} label={row.label} value={row.value} />
         ))}
       </div>
+      {neighbors.length > 0 && <IdealNeighborsBadge neighbors={neighbors} />}
       <ToxicityTable plant={plant} />
+      <CareChart plant={plant} />
       {plant.description && (
         <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-200">
           {plant.description}
@@ -371,8 +514,154 @@ function TagsBlock({ tags }) {
   );
 }
 
-function GallerySection({ images, onUpload, onDelete, uploading, canManage }) {
+function CareBadge({ icon, label, value, tone }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1 text-xs font-semibold ${tone}`}
+    >
+      {icon} {label}: <span className="text-slate-900 dark:text-white">{value}</span>
+    </span>
+  );
+}
+
+function IdealNeighborsBadge({ neighbors }) {
+  const preview = neighbors.slice(0, 3);
+  return (
+    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 text-sm text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+      <p className="font-semibold">Совместимо с:</p>
+      <p>{preview.map((item) => item.common_name).join(", ")}</p>
+    </div>
+  );
+}
+
+function CareChart({ plant }) {
+  const data = React.useMemo(() => buildCareChartData(plant), [plant]);
+  if (!data.length) return null;
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-800/40">
+      <p className="mb-2 text-sm font-semibold text-slate-600 dark:text-slate-200">Диаграмма ухода</p>
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id="wateringGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="bloomGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#f97316" stopOpacity={0.4} />
+              <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 12 }} />
+          <YAxis hide domain={[0, 5]} />
+          <RechartsTooltip
+            contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
+            formatter={(value, name) =>
+              [
+                value,
+                name === "watering" ? "Полив" : name === "bloom" ? "Цветение" : "Подкормка",
+              ]
+            }
+          />
+          <Area type="monotone" dataKey="watering" stroke="#3b82f6" fillOpacity={1} fill="url(#wateringGradient)" />
+          <Area type="monotone" dataKey="bloom" stroke="#f97316" fillOpacity={1} fill="url(#bloomGradient)" />
+          <Area type="monotone" dataKey="feeding" stroke="#14b8a6" fillOpacity={0.2} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function SimilarPlants({ items }) {
+  if (!items?.length) return null;
+  return (
+    <section className="space-y-4 rounded-3xl border border-slate-100 bg-white/90 p-5 shadow-sm dark:border-white/10 dark:bg-slate-900/60">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Похожие растения</h3>
+        <span className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {items.length} шт.
+        </span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => {
+          const image = item.main_preview_url || item.main_image_url;
+          return (
+            <Link
+              key={item.id}
+              to={`/plants/${item.slug}`}
+              className="group flex gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3 transition hover:border-blue-200 hover:bg-white dark:border-white/10 dark:bg-slate-800/40"
+            >
+              <div className="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900/60">
+                {image ? (
+                  <img src={image} alt={item.common_name} className="h-full w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-slate-400">🌱</div>
+                )}
+              </div>
+              <div className="flex flex-col justify-center">
+                <p className="font-semibold text-slate-800 transition group-hover:text-blue-600 dark:text-white">
+                  {item.common_name}
+                </p>
+                {item.category && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{item.category}</span>
+                )}
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ConfirmDeleteDialog({ open, plantName, loading, onCancel, onConfirm }) {
+  return (
+    <Modal open={open} onClose={loading ? undefined : onCancel} title="Удалить растение?" maxWidth="max-w-md">
+      <div className="space-y-4 text-sm text-slate-700 dark:text-slate-200">
+        <p>
+          Вы уверены, что хотите удалить «{plantName}»? Действие необратимо и удалит все связанные фото и статьи.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-slate-300 dark:border-white/10 dark:text-slate-300"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className="rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-60"
+          >
+            {loading ? "Удаление..." : "Удалить"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function GallerySection({ images, onUpload, onDelete, onReorder, uploading, canManage }) {
   const inputRef = React.useRef(null);
+  const [localImages, setLocalImages] = React.useState(images);
+  const [draggingId, setDraggingId] = React.useState(null);
+
+  React.useEffect(() => {
+    setLocalImages(images);
+  }, [images]);
+
+  const handleDrop = (targetId) => {
+    if (!draggingId || draggingId === targetId) return;
+    const next = reorderImages(localImages, draggingId, targetId);
+    setLocalImages(next);
+    setDraggingId(null);
+    onReorder?.(next.map((img) => img.id));
+  };
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
@@ -399,23 +688,41 @@ function GallerySection({ images, onUpload, onDelete, uploading, canManage }) {
           }}
         />
       </div>
-      {images.length === 0 ? (
+      {localImages.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500 dark:border-white/20 dark:text-slate-400">
           Пока нет дополнительных фото.
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {images.map((image) => (
-            <div key={image.id} className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-white/10 dark:bg-slate-800/40">
+          {localImages.map((image) => (
+            <div
+              key={image.id}
+              draggable={canManage}
+              onDragStart={() => setDraggingId(image.id)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDrop(image.id);
+              }}
+              onDragEnd={() => setDraggingId(null)}
+              className={`group relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 transition dark:border-white/10 dark:bg-slate-800/40 ${
+                draggingId === image.id ? "ring-2 ring-blue-400" : ""
+              }`}
+            >
               <img src={image.preview_url || image.image_url} alt="Фото растения" className="h-48 w-full object-cover" loading="lazy" />
               {canManage && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(image.id)}
-                  className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-rose-600 shadow hover:bg-white"
-                >
-                  Удалить
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(image.id)}
+                    className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-rose-600 shadow hover:bg-white"
+                  >
+                    Удалить
+                  </button>
+                  <span className="absolute left-3 top-3 rounded-full bg-slate-900/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    ⇅
+                  </span>
+                </>
               )}
             </div>
           ))}
@@ -425,22 +732,48 @@ function GallerySection({ images, onUpload, onDelete, uploading, canManage }) {
   );
 }
 
-function ArticleSection({ html, updatedAt, canManage, onEdit }) {
+function reorderImages(list, sourceId, targetId) {
+  const next = [...list];
+  const from = next.findIndex((item) => item.id === sourceId);
+  const to = next.findIndex((item) => item.id === targetId);
+  if (from === -1 || to === -1) return list;
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+function ArticleSection({ html, markdown, updatedAt, canManage, onEdit, canGenerate, onGenerate, generating }) {
   return (
     <section className="space-y-3 rounded-3xl border border-slate-100 bg-white/90 p-5 shadow-sm dark:border-white/10 dark:bg-slate-900/60">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Статья</h3>
         {canManage && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-blue-200 hover:text-blue-600 dark:border-white/10 dark:text-slate-200"
-          >
-            Редактировать
-          </button>
+          <div className="flex gap-2">
+            {canGenerate && (
+              <button
+                type="button"
+                onClick={onGenerate}
+                disabled={generating}
+                className="rounded-2xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-emerald-400/40 dark:text-emerald-200"
+              >
+                {generating ? "Отправка..." : "Сгенерировать"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-blue-200 hover:text-blue-600 dark:border-white/10 dark:text-slate-200"
+            >
+              Редактировать
+            </button>
+          </div>
         )}
       </div>
-      {html ? (
+      {markdown ? (
+        <div className="prose max-w-none text-slate-700 dark:prose-invert dark:text-slate-100">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+        </div>
+      ) : html ? (
         <div className="prose max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: html }} />
       ) : (
         <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-500 dark:border-white/10 dark:text-slate-300">
@@ -522,6 +855,16 @@ function EditPlantDialog({ open, onClose, plant, dicts, tags, loading, onSave })
           </div>
 
           <DictSelectRow dicts={dicts} form={form} onChange={handleSelectArray} />
+
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={form.is_published}
+              onChange={(e) => setForm((prev) => ({ ...prev, is_published: e.target.checked }))}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>Опубликовать на сайте</span>
+          </label>
 
           <label className="block">
             <span className="text-xs font-semibold uppercase text-slate-400">Описание</span>
@@ -610,6 +953,7 @@ function DictSelectRow({ dicts = {}, form, onChange }) {
     { field: "humidity_id", label: "Влажность", options: dicts.humidity || [] },
     { field: "temperature_id", label: "Температура", options: dicts.temperature || [] },
     { field: "location_id", label: "Локация", options: dicts.locations || [] },
+    { field: "category_id", label: "Категория", options: dicts.categories || [] },
   ];
   return (
     <div className="grid gap-3 md:grid-cols-2">
@@ -675,6 +1019,7 @@ function buildFormState(plant) {
       humidity_id: "",
       temperature_id: "",
       location_id: "",
+      category_id: "",
       description: "",
       max_height_cm: "",
       leaf_color: "",
@@ -685,6 +1030,7 @@ function buildFormState(plant) {
       toxicity_for_dogs_level: "",
       toxicity_for_humans_level: "",
       tags: [],
+      is_published: false,
     };
   }
   return {
@@ -699,6 +1045,7 @@ function buildFormState(plant) {
     humidity_id: plant.humidity?.id || "",
     temperature_id: plant.temperature?.id || "",
     location_id: plant.location?.id || "",
+    category_id: plant.category?.id || "",
     description: plant.description || "",
     max_height_cm: plant.max_height_cm || "",
     leaf_color: plant.leaf_color || "",
@@ -709,6 +1056,7 @@ function buildFormState(plant) {
     toxicity_for_dogs_level: plant.toxicity_for_dogs_level ?? "",
     toxicity_for_humans_level: plant.toxicity_for_humans_level ?? "",
     tags: (plant.tags || []).map((tag) => tag.id),
+    is_published: Boolean(plant.is_published),
   };
 }
 
@@ -720,6 +1068,7 @@ function formToPayload(form) {
   payload.humidity_id = numberOrNull(payload.humidity_id);
   payload.temperature_id = numberOrNull(payload.temperature_id);
   payload.location_id = numberOrNull(payload.location_id);
+  payload.category_id = numberOrNull(payload.category_id);
   payload.max_height_cm = numberOrNull(payload.max_height_cm);
   payload.blooming_month = numberOrNull(payload.blooming_month);
   payload.toxicity_for_cats_level = numberOrNull(payload.toxicity_for_cats_level);
@@ -727,6 +1076,7 @@ function formToPayload(form) {
   payload.toxicity_for_humans_level = numberOrNull(payload.toxicity_for_humans_level);
   payload.tags = form.tags;
   payload.acquisition_date = payload.acquisition_date || null;
+  payload.is_published = Boolean(form.is_published);
   return payload;
 }
 
@@ -780,4 +1130,38 @@ function transformContent(html) {
     }
   });
   return doc.body.innerHTML;
+}
+
+function buildCareBadges(plant) {
+  const badges = [];
+  if (plant.light?.name) badges.push({ icon: "☀️", label: "Свет", value: plant.light.name, tone: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-100" });
+  if (plant.watering?.name) badges.push({ icon: "💧", label: "Полив", value: plant.watering.name, tone: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-100" });
+  if (plant.humidity?.name) badges.push({ icon: "💨", label: "Влажность", value: plant.humidity.name, tone: "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/40 dark:bg-cyan-500/10 dark:text-cyan-100" });
+  if (plant.blooming_month) badges.push({ icon: "🌸", label: "Цветение", value: MONTHS[plant.blooming_month - 1], tone: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/40 dark:bg-rose-500/10 dark:text-rose-100" });
+  return badges;
+}
+
+function buildCareChartData(plant) {
+  if (!plant?.watering?.name && !plant?.blooming_month) return [];
+  const wateringScore = scoreFromDescriptor(plant.watering?.name);
+  const feedingBase = Math.max(1, wateringScore - 1);
+  return MONTHS.map((label, index) => {
+    const month = index + 1;
+    const bloom = plant.blooming_month === month ? 5 : 0;
+    return {
+      month: label.slice(0, 3),
+      watering: wateringScore,
+      feeding: bloom ? 4 : feedingBase,
+      bloom,
+    };
+  });
+}
+
+function scoreFromDescriptor(text) {
+  if (!text) return 2;
+  const value = text.toLowerCase();
+  if (value.includes("част")) return 4;
+  if (value.includes("умер")) return 3;
+  if (value.includes("редк")) return 1;
+  return 2;
 }

@@ -35,6 +35,12 @@ const TOX_LEVELS = [
   { value: 2, label: "Средняя" },
   { value: 3, label: "Высокая" },
 ];
+const COLLECTION_OPTIONS = [
+  { key: "easy", label: "Легкие в уходе" },
+  { key: "bedroom", label: "Для спальни" },
+  { key: "winter_bloom", label: "Цветущие зимой" },
+  { key: "non_toxic", label: "Нетоксичные" },
+];
 
 const DEFAULT_FILTERS = {
   query: "",
@@ -45,6 +51,7 @@ const DEFAULT_FILTERS = {
   humidity: [],
   temperature: [],
   location: [],
+  category: [],
   tags: [],
   bloom: [],
   tox_cat: [],
@@ -52,6 +59,9 @@ const DEFAULT_FILTERS = {
   tox_human: [],
   family: "",
   origin: "",
+  with_photo: false,
+  without_article: false,
+  collection: "",
 };
 
 export default function PlantsList() {
@@ -80,24 +90,21 @@ export default function PlantsList() {
   const filterState = React.useMemo(() => parseFilters(queryState), [queryState]);
   const pageLimit = meta?.config?.pageLimit || 24;
   const requestSignature = React.useMemo(
-    () => JSON.stringify({ ...filterState, limit: pageLimit, reloadKey }),
-    [filterState, pageLimit, reloadKey]
+    () => JSON.stringify({ ...filterState, limit: pageLimit, reloadKey, includeDrafts: canManage }),
+    [filterState, pageLimit, reloadKey, canManage]
   );
 
-  const hasActiveFilters = React.useMemo(
-    () =>
-      filterState.query ||
-      filterState.family ||
-      filterState.origin ||
-      Object.entries(filterState).some(
-        ([key, value]) =>
-          Array.isArray(value) &&
-          value.length > 0 &&
-          !["tags"].includes(key)
-      ) ||
-      filterState.tags.length > 0,
-    [filterState]
-  );
+  const hasActiveFilters = React.useMemo(() => {
+    if (filterState.query || filterState.family || filterState.origin) return true;
+    if (filterState.with_photo || filterState.without_article || filterState.collection) return true;
+    if (filterState.tags.length > 0) return true;
+    return Object.entries(filterState).some(
+      ([key, value]) =>
+        Array.isArray(value) &&
+        value.length > 0 &&
+        !["tags"].includes(key)
+    );
+  }, [filterState]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -136,11 +143,13 @@ export default function PlantsList() {
       try {
         setLoading(true);
         setItems([]);
-        const data = await plantsApi.list({
+        const params = {
           ...filtersToParams(filterState),
           limit: pageLimit,
           offset: 0,
-        });
+        };
+        if (canManage) params.include_drafts = 1;
+        const data = await plantsApi.list(params);
         if (isCancelled) return;
         setItems(data.items || []);
         setTotal(data.total || 0);
@@ -160,17 +169,19 @@ export default function PlantsList() {
     return () => {
       isCancelled = true;
     };
-  }, [pageLimit, filterState.sort, requestSignature]);
+  }, [pageLimit, filterState.sort, requestSignature, canManage]);
 
   const loadMore = React.useCallback(async () => {
     if (loading || loadingMore || !hasMore) return;
     try {
       setLoadingMore(true);
-      const data = await plantsApi.list({
+      const params = {
         ...filtersToParams(filterState),
         limit: pageLimit,
         offset: nextOffset,
-      });
+      };
+      if (canManage) params.include_drafts = 1;
+      const data = await plantsApi.list(params);
       setItems((prev) => [...prev, ...(data.items || [])]);
       const receivedOffset = data.offset ?? nextOffset;
       const newOffset = receivedOffset + (data.items?.length || 0);
@@ -181,7 +192,7 @@ export default function PlantsList() {
     } finally {
       setLoadingMore(false);
     }
-  }, [filterState, hasMore, loading, loadingMore, nextOffset, pageLimit, total]);
+  }, [filterState, hasMore, loading, loadingMore, nextOffset, pageLimit, total, canManage]);
 
   const sentinelRef = React.useRef(null);
   React.useEffect(() => {
@@ -228,6 +239,7 @@ export default function PlantsList() {
       humidity: undefined,
       temperature: undefined,
       location: undefined,
+       category: undefined,
       tags: undefined,
       bloom: undefined,
       tox_cat: undefined,
@@ -235,6 +247,9 @@ export default function PlantsList() {
       tox_human: undefined,
       family: undefined,
       origin: undefined,
+      with_photo: undefined,
+      without_article: undefined,
+      collection: undefined,
     });
   };
 
@@ -399,10 +414,7 @@ function PlantGrid({ items, loading, loadingMore, total, hasActiveFilters, canMa
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, idx) => (
-          <div
-            key={idx}
-            className="h-64 animate-pulse rounded-3xl border border-slate-100 bg-white/70 dark:border-white/10 dark:bg-slate-900/40"
-          />
+          <SkeletonCard key={idx} />
         ))}
       </div>
     );
@@ -432,10 +444,28 @@ function PlantGrid({ items, loading, loadingMore, total, hasActiveFilters, canMa
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {items.map((plant) => (
-          <PlantCard key={plant.id} plant={plant} />
-        ))}
+        <AnimatePresence>
+          {items.map((plant) => (
+            <motion.div
+              key={plant.id}
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.25 }}
+            >
+              <PlantCard plant={plant} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
+      {loading && items.length > 0 && (
+        <div className="mt-4 grid gap-4 opacity-60 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: Math.min(4, items.length) }).map((_, idx) => (
+            <SkeletonCard key={`loading-${idx}`} />
+          ))}
+        </div>
+      )}
       {loadingMore && (
         <div className="text-center text-sm text-slate-500 dark:text-slate-400">Загрузка...</div>
       )}
@@ -444,8 +474,22 @@ function PlantGrid({ items, loading, loadingMore, total, hasActiveFilters, canMa
   );
 }
 
+function SkeletonCard() {
+  return (
+    <div className="rounded-3xl border border-slate-100 bg-white/80 p-4 dark:border-white/10 dark:bg-slate-900/40">
+      <div className="h-48 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+      <div className="mt-4 space-y-2">
+        <div className="h-4 w-3/4 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+        <div className="h-3 w-1/2 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
 function PlantCard({ plant }) {
   const image = plant.main_preview_url || plant.main_image_url;
+  const monthLabel = plant.blooming_month ? MONTHS[plant.blooming_month - 1] : null;
+  const stats = buildCardBadges(plant);
   return (
     <Link
       to={`/plants/${plant.slug}`}
@@ -478,24 +522,35 @@ function PlantCard({ plant }) {
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-1">
-        <h3 className="text-base font-semibold text-slate-900 transition group-hover:text-blue-600 dark:text-white">
-          {plant.common_name}
-        </h3>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-slate-900 transition group-hover:text-blue-600 dark:text-white">
+            {plant.common_name}
+          </h3>
+          {plant.category && (
+            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-100">
+              {plant.category}
+            </span>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-300">
-          {plant.light && <Badge label="Свет" value={plant.light} />}
-          {plant.watering && <Badge label="Полив" value={plant.watering} />}
+          {stats.map((stat) => (
+            <Badge key={stat.label} icon={stat.icon} value={stat.value} />
+          ))}
           <ToxicityBadge toxicity={plant.toxicity} />
         </div>
+        {monthLabel && (
+          <div className="text-xs text-amber-600 dark:text-amber-200">🌸 Цветет: {monthLabel}</div>
+        )}
       </div>
     </Link>
   );
 }
 
-function Badge({ label, value }) {
+function Badge({ icon, value }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800/60 dark:text-slate-200">
-      {label}: <span className="text-slate-900 dark:text-white">{value}</span>
+      {icon} <span className="text-slate-900 dark:text-white">{value}</span>
     </span>
   );
 }
@@ -597,6 +652,20 @@ function FiltersDrawer({ open, filters, dicts, tags, loading, onClose, onChange,
                   options={dicts?.locations || []}
                   value={filters.location}
                   onChange={(next) => onChange((prev) => ({ ...prev, location: next }))}
+                />
+                <FilterMultiSelect
+                  title="Категория"
+                  options={dicts?.categories || []}
+                  value={filters.category}
+                  onChange={(next) => onChange((prev) => ({ ...prev, category: next }))}
+                />
+                <FilterCollections
+                  value={filters.collection}
+                  onChange={(value) => onChange((prev) => ({ ...prev, collection: value }))}
+                />
+                <FilterContentToggles
+                  values={filters}
+                  onChange={(patch) => onChange((prev) => ({ ...prev, ...patch }))}
                 />
                 <FilterText
                   title="Семейство"
@@ -799,6 +868,61 @@ function FilterTags({ tags, value, onChange }) {
     </section>
   );
 }
+
+function FilterCollections({ value, onChange }) {
+  return (
+    <section>
+      <h3 className="mb-2 text-sm font-semibold text-slate-600 dark:text-slate-200">Подборки</h3>
+      <div className="flex flex-wrap gap-2">
+        {COLLECTION_OPTIONS.map((option) => {
+          const active = option.key === value;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => onChange(active ? "" : option.key)}
+              className={`rounded-2xl border px-3 py-1 text-xs font-semibold ${
+                active
+                  ? "border-purple-400 bg-purple-50 text-purple-700 dark:border-purple-400/60 dark:bg-purple-500/10 dark:text-purple-100"
+                  : "border-slate-200 text-slate-500 hover:border-purple-200 hover:text-purple-600 dark:border-white/10 dark:text-slate-300"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function FilterContentToggles({ values, onChange }) {
+  return (
+    <section>
+      <h3 className="mb-2 text-sm font-semibold text-slate-600 dark:text-slate-200">Контент</h3>
+      <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={values.with_photo}
+            onChange={(e) => onChange({ with_photo: e.target.checked })}
+            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          />
+          С фото
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={values.without_article}
+            onChange={(e) => onChange({ without_article: e.target.checked })}
+            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          />
+          Без статьи
+        </label>
+      </div>
+    </section>
+  );
+}
 function CreatePlantDialog({ open, onClose, onCreated }) {
   const [name, setName] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -871,6 +995,7 @@ function parseFilters(query) {
     humidity: parseNumberList(query.humidity),
     temperature: parseNumberList(query.temperature),
     location: parseNumberList(query.location),
+    category: parseNumberList(query.category),
     tags: parseNumberList(query.tags),
     bloom: parseNumberList(query.bloom),
     tox_cat: parseNumberList(query.tox_cat),
@@ -878,6 +1003,9 @@ function parseFilters(query) {
     tox_human: parseNumberList(query.tox_human),
     family: query.family || "",
     origin: query.origin || "",
+    with_photo: query.with_photo === "1" || query.with_photo === true,
+    without_article: query.without_article === "1" || query.without_article === true,
+    collection: query.collection || "",
   };
 }
 
@@ -899,6 +1027,7 @@ function filtersToParams(filters) {
     humidity: filters.humidity,
     temperature: filters.temperature,
     location: filters.location,
+    category: filters.category,
     tags: filters.tags,
     bloom: filters.bloom,
     tox_cat: filters.tox_cat,
@@ -906,6 +1035,9 @@ function filtersToParams(filters) {
     tox_human: filters.tox_human,
     family: filters.family || undefined,
     origin: filters.origin || undefined,
+    with_photo: filters.with_photo ? "1" : undefined,
+    without_article: filters.without_article ? "1" : undefined,
+    collection: filters.collection || undefined,
   };
 }
 
@@ -922,6 +1054,9 @@ function filtersToQueryPatch(filters) {
       patch[key] = value;
     }
   });
+  patch.with_photo = filters.with_photo ? "1" : undefined;
+  patch.without_article = filters.without_article ? "1" : undefined;
+  patch.collection = filters.collection || undefined;
   return patch;
 }
 
@@ -943,12 +1078,20 @@ function buildDictMaps(meta) {
   return map;
 }
 
+function buildCardBadges(plant) {
+  const badges = [];
+  if (plant.light) badges.push({ icon: "☀️", value: plant.light, label: "light" });
+  if (plant.watering) badges.push({ icon: "💧", value: plant.watering, label: "watering" });
+  if (plant.humidity) badges.push({ icon: "💨", value: plant.humidity, label: "humidity" });
+  return badges;
+}
+
 function buildFilterChips(filters, dictMaps) {
   const chips = [];
   const addChip = (key, label) => {
     chips.push({ key, label });
   };
-  const dictFields = ["light", "watering", "soil", "humidity", "temperature", "location"];
+  const dictFields = ["light", "watering", "soil", "humidity", "temperature", "location", "category"];
   dictFields.forEach((field) => {
     if ((filters[field] || []).length) {
       const names =
@@ -976,6 +1119,12 @@ function buildFilterChips(filters, dictMaps) {
   });
   if (filters.family) addChip("family", `Семейство: ${filters.family}`);
   if (filters.origin) addChip("origin", `Происхождение: ${filters.origin}`);
+  if (filters.with_photo) addChip("with_photo", "Только с фото");
+  if (filters.without_article) addChip("without_article", "Без статьи");
+  if (filters.collection) {
+    const option = COLLECTION_OPTIONS.find((opt) => opt.key === filters.collection);
+    addChip("collection", option ? `Подборка: ${option.label}` : "Подборка");
+  }
   return chips;
 }
 

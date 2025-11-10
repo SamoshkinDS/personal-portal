@@ -44,6 +44,7 @@ const DEFAULT_LOCATIONS = [
 ];
 
 const DEFAULT_TAGS = ["суккулент", "цветущий", "тенелюбивый"];
+const DEFAULT_CATEGORIES = ["Комнатные", "Цветущие", "Суккуленты", "Деревья", "Ампельные"];
 
 async function seedDictionary(tableName, values) {
   for (const name of values) {
@@ -95,6 +96,12 @@ export async function ensurePlantsSchema() {
       name TEXT UNIQUE NOT NULL
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dict_categories (
+      id SERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL
+    );
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS plant_tags (
@@ -127,6 +134,8 @@ export async function ensurePlantsSchema() {
       toxicity_for_humans_level INT,
       acquisition_date DATE,
       location_id INT REFERENCES dict_locations(id),
+      category_id INT REFERENCES dict_categories(id),
+      is_published BOOLEAN DEFAULT false,
       main_image_url TEXT,
       main_preview_url TEXT,
       main_image_key TEXT,
@@ -146,8 +155,18 @@ export async function ensurePlantsSchema() {
       preview_url TEXT,
       image_key TEXT,
       preview_key TEXT,
+      "order" INT,
       created_at TIMESTAMPTZ DEFAULT now()
     );
+  `);
+  await pool.query(`ALTER TABLE plant_images ADD COLUMN IF NOT EXISTS "order" INT;`);
+  await pool.query(`
+    ALTER TABLE plants
+    ADD COLUMN IF NOT EXISTS category_id INT REFERENCES dict_categories(id);
+  `);
+  await pool.query(`
+    ALTER TABLE plants
+    ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT false;
   `);
 
   await pool.query(`
@@ -157,6 +176,24 @@ export async function ensurePlantsSchema() {
       content_text TEXT,
       updated_by INT,
       updated_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS plants_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS plants_history (
+      id SERIAL PRIMARY KEY,
+      plant_id INT REFERENCES plants(id),
+      user_id INT,
+      field TEXT,
+      old_value TEXT,
+      new_value TEXT,
+      changed_at TIMESTAMPTZ DEFAULT now()
     );
   `);
 
@@ -213,4 +250,5 @@ export async function ensurePlantsSchema() {
   await seedDictionary("dict_temperature", DEFAULT_TEMPERATURE);
   await seedDictionary("dict_locations", DEFAULT_LOCATIONS);
   await seedDictionary("plant_tags", DEFAULT_TAGS);
+  await seedDictionary("dict_categories", DEFAULT_CATEGORIES);
 }

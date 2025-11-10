@@ -39,6 +39,10 @@ export const plantsApi = {
     const res = await apiAuthFetch(`/api/plants${buildQuery(params)}`);
     return jsonOrThrow(res, "Не удалось загрузить каталог растений");
   },
+  async remove(id) {
+    const res = await apiAuthFetch(`/api/plants/${id}`, { method: "DELETE" });
+    return jsonOrThrow(res, "Не удалось удалить растение");
+  },
   async meta() {
     const res = await apiAuthFetch("/api/plants/meta");
     return jsonOrThrow(res, "Не удалось загрузить справочники");
@@ -92,6 +96,14 @@ export const plantsApi = {
     );
     return jsonOrThrow(res, "Не удалось удалить фото");
   },
+  async reorderGallery(id, order) {
+    const res = await apiAuthFetch(`/api/plants/${id}/image/gallery/order`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order }),
+    });
+    return jsonOrThrow(res, "Не удалось изменить порядок галереи");
+  },
   async saveArticle(id, article) {
     const res = await apiAuthFetch(`/api/plants/${id}/article`, {
       method: "PUT",
@@ -99,6 +111,16 @@ export const plantsApi = {
       body: JSON.stringify(article),
     });
     return jsonOrThrow(res, "Не удалось сохранить статью");
+  },
+  async triggerArticleGeneration(id) {
+    const res = await apiAuthFetch(`/api/plants/${id}/article/generate`, {
+      method: "POST",
+    });
+    return jsonOrThrow(res, "Не удалось отправить запрос в n8n");
+  },
+  async clone(id) {
+    const res = await apiAuthFetch(`/api/plants/${id}/clone`, { method: "POST" });
+    return jsonOrThrow(res, "Не удалось создать копию растения");
   },
   async listTags() {
     const res = await apiAuthFetch("/api/plants/tags");
@@ -135,5 +157,17 @@ export const plantsApi = {
       method: "DELETE",
     });
     return jsonOrThrow(res, "Не удалось удалить значение");
+  },
+  async getSettings() {
+    const res = await apiAuthFetch("/api/plants/settings");
+    return jsonOrThrow(res, "Не удалось загрузить настройки растений");
+  },
+  async saveSettings(payload) {
+    const res = await apiAuthFetch("/api/plants/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return jsonOrThrow(res, "Не удалось сохранить настройки растений");
   },
 };

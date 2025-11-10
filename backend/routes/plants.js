@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import sharp from "sharp";
 import { v4 as uuidv4 } from "uuid";
+import { fetch } from "undici";
 import { pool } from "../db/connect.js";
 import { authRequired, requirePermission } from "../middleware/auth.js";
 import { ensureUniquePlantSlug } from "../utils/slugify.js";
@@ -34,6 +35,7 @@ const DICT_TABLES = {
   humidity: "dict_humidity",
   temperature: "dict_temperature",
   locations: "dict_locations",
+  categories: "dict_categories",
 };
 
 const META_TABLES = new Set([...Object.values(DICT_TABLES), "plant_tags"]);
@@ -44,6 +46,7 @@ router.use(authRequired);
 
 router.get("/", async (req, res) => {
   try {
+    const canManage = await userCanManagePlants(req.user?.id);
     const limitParam = Number(req.query.limit);
     const offsetParam = Number(req.query.offset);
     const limit = Math.min(
@@ -53,6 +56,10 @@ router.get("/", async (req, res) => {
     const offset = Number.isFinite(offsetParam) && offsetParam >= 0 ? offsetParam : 0;
     const params = [];
     const filters = buildFilterClauses(req.query, params);
+    const includeDrafts = canManage && String(req.query.include_drafts || "") === "1";
+    if (!includeDrafts) {
+      filters.push("p.is_published = TRUE");
+    }
     const whereSql = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
 
     const sortParam = String(req.query.sort || "alpha_ru");
@@ -66,16 +73,22 @@ router.get("/", async (req, res) => {
         p.id,
         p.slug,
         p.common_name,
+        p.blooming_month,
+        p.is_published,
         p.main_image_url,
         p.main_preview_url,
         dl.name AS light_name,
         dw.name AS watering_name,
+        dh.name AS humidity_name,
+        dc.name AS category_name,
         p.toxicity_for_cats_level,
         p.toxicity_for_dogs_level,
         p.toxicity_for_humans_level
       FROM plants p
       LEFT JOIN dict_light dl ON p.light_id = dl.id
       LEFT JOIN dict_watering dw ON p.watering_id = dw.id
+      LEFT JOIN dict_humidity dh ON p.humidity_id = dh.id
+      LEFT JOIN dict_categories dc ON p.category_id = dc.id
       ${whereSql}
       ORDER BY ${orderBy}
       LIMIT $${params.length + 1}
@@ -93,10 +106,14 @@ router.get("/", async (req, res) => {
       id: row.id,
       slug: row.slug,
       common_name: row.common_name,
+      blooming_month: row.blooming_month,
+      is_published: row.is_published,
       main_image_url: row.main_image_url,
       main_preview_url: row.main_preview_url,
       light: row.light_name,
       watering: row.watering_name,
+      humidity: row.humidity_name,
+      category: row.category_name,
       toxicity: {
         cats: row.toxicity_for_cats_level,
         dogs: row.toxicity_for_dogs_level,
@@ -118,27 +135,57 @@ router.get("/", async (req, res) => {
 
 router.get("/meta", async (_req, res) => {
   try {
-    const [light, watering, soil, humidity, temperature, locations, tags] = await Promise.all([
-      fetchDict("dict_light"),
-      fetchDict("dict_watering"),
-      fetchDict("dict_soil"),
-      fetchDict("dict_humidity"),
-      fetchDict("dict_temperature"),
-      fetchDict("dict_locations"),
-      fetchDict("plant_tags"),
-    ]);
+    const [light, watering, soil, humidity, temperature, locations, categories, tags, settings] =
+      await Promise.all([
+        fetchDict("dict_light"),
+        fetchDict("dict_watering"),
+        fetchDict("dict_soil"),
+        fetchDict("dict_humidity"),
+        fetchDict("dict_temperature"),
+        fetchDict("dict_locations"),
+        fetchDict("dict_categories"),
+        fetchDict("plant_tags"),
+        getPlantsSettings(),
+      ]);
     res.json({
-      dicts: { light, watering, soil, humidity, temperature, locations },
+      dicts: { light, watering, soil, humidity, temperature, locations, categories },
       tags,
       config: {
         pageLimit: PAGE_LIMIT_DEFAULT,
         maxUploadMb: IMAGE_MAX_MB,
         s3Ready: isS3Ready(),
       },
+      settings: {
+        n8n_generate_description_enabled: Boolean(settings?.n8n_generate_description_url),
+      },
     });
   } catch (error) {
     console.error("GET /api/plants/meta", error);
     return respondError(res, error, "Failed to load metadata");
+  }
+});
+
+router.get("/settings", requirePermission("plants_admin"), async (_req, res) => {
+  try {
+    const settings = await getPlantsSettings();
+    res.json({ settings });
+  } catch (error) {
+    console.error("GET /api/plants/settings", error);
+    return respondError(res, error, "Failed to load plants settings");
+  }
+});
+
+router.put("/settings", requirePermission("plants_admin"), async (req, res) => {
+  try {
+    const payload = {
+      n8n_generate_description_url: normalizeUrl(req.body?.n8n_generate_description_url),
+    };
+    await savePlantsSettings(payload);
+    const settings = await getPlantsSettings();
+    res.json({ settings });
+  } catch (error) {
+    console.error("PUT /api/plants/settings", error);
+    return respondError(res, error, "Failed to save plants settings");
   }
 });
 
@@ -245,8 +292,34 @@ router.post("/", requirePermission("plants_admin"), async (req, res) => {
       commonName,
     });
     const inserted = await pool.query(
-      `INSERT INTO plants (slug, common_name, latin_name, english_name, family, origin, light_id, watering_id, soil_id, humidity_id, temperature_id, description, max_height_cm, leaf_color, flower_color, blooming_month, toxicity_for_cats_level, toxicity_for_dogs_level, toxicity_for_humans_level, acquisition_date, location_id, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+      `INSERT INTO plants (
+        slug,
+        common_name,
+        latin_name,
+        english_name,
+        family,
+        origin,
+        light_id,
+        watering_id,
+        soil_id,
+        humidity_id,
+        temperature_id,
+        description,
+        max_height_cm,
+        leaf_color,
+        flower_color,
+        blooming_month,
+        toxicity_for_cats_level,
+        toxicity_for_dogs_level,
+        toxicity_for_humans_level,
+        acquisition_date,
+        location_id,
+        category_id,
+        is_published,
+        status,
+        created_by
+      )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
        RETURNING id, slug, common_name`,
       [
         slug,
@@ -270,6 +343,8 @@ router.post("/", requirePermission("plants_admin"), async (req, res) => {
         toNullableToxic(body.toxicity_for_humans_level),
         nullableDate(body.acquisition_date),
         toNullableInt(body.location_id),
+        toNullableInt(body.category_id),
+        toBooleanFlag(body.is_published),
         validateStatus(body.status),
         req.user?.id || null,
       ]
@@ -307,10 +382,19 @@ router.patch("/:id", requirePermission("plants_admin"), async (req, res) => {
       "toxicity_for_humans_level",
       "acquisition_date",
       "location_id",
+      "category_id",
+      "is_published",
       "status",
     ];
+    const existingQ = await pool.query(
+      `SELECT ${allowedFields.map((field) => `${field}`).join(", ")} FROM plants WHERE id = $1`,
+      [id]
+    );
+    if (!existingQ.rows.length) return res.status(404).json({ message: "Plant not found" });
+    const existing = existingQ.rows[0];
     const sets = [];
     const params = [];
+    const historyEntries = [];
     for (const field of allowedFields) {
       if (!(field in body)) continue;
       let value = body[field];
@@ -324,6 +408,8 @@ router.patch("/:id", requirePermission("plants_admin"), async (req, res) => {
         value = toNullableToxic(value);
       } else if (field === "acquisition_date") {
         value = nullableDate(value);
+      } else if (field === "is_published") {
+        value = toBooleanFlag(value);
       } else if (field === "status") {
         value = validateStatus(value);
       } else {
@@ -331,6 +417,13 @@ router.patch("/:id", requirePermission("plants_admin"), async (req, res) => {
       }
       sets.push(`${field} = $${params.length + 1}`);
       params.push(value);
+      if (!valuesEqual(existing[field], value)) {
+        historyEntries.push({
+          field,
+          oldValue: existing[field],
+          newValue: value,
+        });
+      }
     }
     if (!sets.length && !Array.isArray(body.tags) && !Array.isArray(body.tag_names)) {
       return res.status(400).json({ message: "Nothing to update" });
@@ -359,11 +452,125 @@ router.patch("/:id", requirePermission("plants_admin"), async (req, res) => {
     if (Array.isArray(body.tags) || Array.isArray(body.tag_names)) {
       await upsertPlantTags(id, body.tags, body.tag_names);
     }
+    if (historyEntries.length) {
+      await recordHistoryEntries(id, req.user?.id || null, historyEntries);
+    }
     const plant = await fetchPlantDetail({ id });
     res.json({ plant });
   } catch (error) {
     console.error("PATCH /api/plants/:id", error);
     return respondError(res, error, "Failed to update plant");
+  }
+});
+
+router.post("/:id/clone", requirePermission("plants_admin"), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id" });
+    const sourceQ = await pool.query(
+      `SELECT
+        id,
+        common_name,
+        latin_name,
+        english_name,
+        family,
+        origin,
+        light_id,
+        watering_id,
+        soil_id,
+        humidity_id,
+        temperature_id,
+        description,
+        max_height_cm,
+        leaf_color,
+        flower_color,
+        blooming_month,
+        toxicity_for_cats_level,
+        toxicity_for_dogs_level,
+        toxicity_for_humans_level,
+        acquisition_date,
+        location_id,
+        category_id
+       FROM plants
+       WHERE id = $1`,
+      [id]
+    );
+    if (!sourceQ.rows.length) return res.status(404).json({ message: "Plant not found" });
+    const source = sourceQ.rows[0];
+    const cloneName = `Копия ${source.common_name}`.trim();
+    const slug = await ensureUniquePlantSlug({
+      englishName: source.english_name,
+      latinName: source.latin_name,
+      commonName: cloneName,
+    });
+    const inserted = await pool.query(
+      `INSERT INTO plants (
+        slug,
+        common_name,
+        latin_name,
+        english_name,
+        family,
+        origin,
+        light_id,
+        watering_id,
+        soil_id,
+        humidity_id,
+        temperature_id,
+        description,
+        max_height_cm,
+        leaf_color,
+        flower_color,
+        blooming_month,
+        toxicity_for_cats_level,
+        toxicity_for_dogs_level,
+        toxicity_for_humans_level,
+        acquisition_date,
+        location_id,
+        category_id,
+        is_published,
+        status,
+        created_by
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+      RETURNING id, slug`,
+      [
+        slug,
+        cloneName,
+        source.latin_name,
+        source.english_name,
+        source.family,
+        source.origin,
+        source.light_id,
+        source.watering_id,
+        source.soil_id,
+        source.humidity_id,
+        source.temperature_id,
+        source.description,
+        source.max_height_cm,
+        source.leaf_color,
+        source.flower_color,
+        source.blooming_month,
+        source.toxicity_for_cats_level,
+        source.toxicity_for_dogs_level,
+        source.toxicity_for_humans_level,
+        source.acquisition_date,
+        source.location_id,
+        source.category_id,
+        false,
+        "created",
+        req.user?.id || null,
+      ]
+    );
+    const newPlant = inserted.rows[0];
+    await pool.query(
+      `INSERT INTO plant_tag_map (plant_id, tag_id)
+       SELECT $1, tag_id FROM plant_tag_map WHERE plant_id = $2`,
+      [newPlant.id, id]
+    );
+    res.status(201).json({ plant: newPlant });
+  } catch (error) {
+    console.error("POST /api/plants/:id/clone", error);
+    return respondError(res, error, "Failed to clone plant");
   }
 });
 
@@ -405,6 +612,41 @@ router.put("/:id/article", requirePermission("plants_admin"), async (req, res) =
     return respondError(res, error, "Failed to save article");
   }
 });
+
+router.post(
+  "/:id/article/generate",
+  requirePermission("plants_admin"),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id" });
+      const settings = await getPlantsSettings();
+      const webhookUrl = settings?.n8n_generate_description_url;
+      if (!webhookUrl) {
+        return res.status(400).json({ message: "n8n webhook URL is not configured" });
+      }
+      const plantRow = await pool.query("SELECT id, common_name FROM plants WHERE id = $1", [id]);
+      if (!plantRow.rows.length) return res.status(404).json({ message: "Plant not found" });
+      const payload = {
+        plant_name: plantRow.rows[0].common_name,
+        plant_id: plantRow.rows[0].id,
+      };
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const message = await safeReadJson(response);
+        return res.status(502).json({ message: message || "Webhook responded with error" });
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("POST /api/plants/:id/article/generate", error);
+      return respondError(res, error, "Failed to dispatch article generation");
+    }
+  }
+);
 
 router.post("/:id/image/main", requirePermission("plants_admin"), upload.single("file"), async (req, res) => {
   try {
@@ -474,6 +716,11 @@ router.post("/:id/image/gallery", requirePermission("plants_admin"), upload.arra
     if (!isS3Ready()) return res.status(400).json({ message: "S3 is not configured" });
     const exists = await pool.query("SELECT 1 FROM plants WHERE id = $1", [id]);
     if (!exists.rows.length) return res.status(404).json({ message: "Plant not found" });
+    const orderRow = await pool.query(
+      'SELECT COALESCE(MAX("order"), -1) AS max_order FROM plant_images WHERE plant_id = $1',
+      [id]
+    );
+    let nextOrder = Number(orderRow.rows[0]?.max_order ?? -1) + 1;
 
     const uploads = [];
     for (const file of files) {
@@ -497,22 +744,20 @@ router.post("/:id/image/gallery", requirePermission("plants_admin"), upload.arra
           cacheControl: "public, max-age=31536000",
         }),
       ]);
-      uploads.push({ id: photoId, imageUrl, previewUrl, mainKey, previewKey });
+      uploads.push({ id: photoId, imageUrl, previewUrl, mainKey, previewKey, order: nextOrder });
+      nextOrder += 1;
     }
 
     for (const entry of uploads) {
       await pool.query(
-        `INSERT INTO plant_images (id, plant_id, image_url, preview_url, image_key, preview_key)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [entry.id, id, entry.imageUrl, entry.previewUrl, entry.mainKey, entry.previewKey]
+        `INSERT INTO plant_images (id, plant_id, image_url, preview_url, image_key, preview_key, "order")
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [entry.id, id, entry.imageUrl, entry.previewUrl, entry.mainKey, entry.previewKey, entry.order]
       );
     }
 
-    const gallery = await pool.query(
-      "SELECT id, image_url, preview_url FROM plant_images WHERE plant_id = $1 ORDER BY created_at ASC",
-      [id]
-    );
-    res.json({ gallery: gallery.rows });
+    const gallery = await fetchGallery(id);
+    res.json({ gallery });
   } catch (error) {
     console.error("POST /api/plants/:id/image/gallery", error);
     return respondError(res, error, "Failed to upload gallery images");
@@ -545,20 +790,82 @@ router.delete(
   }
 );
 
+router.put(
+  "/:id/image/gallery/order",
+  requirePermission("plants_admin"),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id" });
+      const ordered = Array.isArray(req.body?.order)
+        ? req.body.order.map((value) => String(value))
+        : [];
+      if (!ordered.length) {
+        return res.status(400).json({ message: "order array is required" });
+      }
+      const images = await pool.query("SELECT id FROM plant_images WHERE plant_id = $1", [id]);
+      if (!images.rows.length) {
+        return res.status(404).json({ message: "Gallery is empty" });
+      }
+      const existingIds = new Set(images.rows.map((row) => row.id));
+      const orderedSet = new Set(ordered);
+      if (existingIds.size !== orderedSet.size || ordered.some((imageId) => !existingIds.has(imageId))) {
+        return res.status(400).json({ message: "order must include all image ids" });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        for (let idx = 0; idx < ordered.length; idx += 1) {
+          await client.query(
+            `UPDATE plant_images
+             SET "order" = $3
+             WHERE plant_id = $1 AND id = $2`,
+            [id, ordered[idx], idx]
+          );
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+      const gallery = await fetchGallery(id);
+      res.json({ gallery });
+    } catch (error) {
+      console.error("PUT /api/plants/:id/image/gallery/order", error);
+      return respondError(res, error, "Failed to reorder gallery");
+    }
+  }
+);
+
+router.delete("/:id", requirePermission("plants_admin"), async (req, res) => {
+  try {
+    const plantId = await resolvePlantId(req.params.id);
+    if (!plantId) return res.status(404).json({ message: "Plant not found" });
+    const deleted = await pool.query("DELETE FROM plants WHERE id = $1 RETURNING id", [plantId]);
+    if (!deleted.rows.length) return res.status(404).json({ message: "Plant not found" });
+    res.json({ message: "Plant removed" });
+  } catch (error) {
+    console.error("DELETE /api/plants/:id", error);
+    return respondError(res, error, "Failed to remove plant");
+  }
+});
+
 router.get("/:identifier", async (req, res) => {
   try {
     const identifier = req.params.identifier;
-    const isNumeric = /^\d+$/.test(identifier);
-    const plant = await fetchPlantDetail(
-      isNumeric ? { id: Number(identifier) } : { slug: identifier }
-    );
+    const numeric = /^\d+$/.test(identifier);
+    let plant = await fetchPlantDetail({ slug: identifier });
+    let resolvedViaSlug = Boolean(plant);
+    if (!plant && numeric) {
+      plant = await fetchPlantDetail({ id: Number(identifier) });
+      resolvedViaSlug = false;
+    }
     if (!plant) {
       return res.status(404).json({ message: "Plant not found" });
     }
-    const gallery = await pool.query(
-      "SELECT id, image_url, preview_url FROM plant_images WHERE plant_id = $1 ORDER BY created_at ASC",
-      [plant.id]
-    );
     const tags = await pool.query(
       `SELECT t.id, t.name
        FROM plant_tag_map pt
@@ -567,12 +874,19 @@ router.get("/:identifier", async (req, res) => {
        ORDER BY t.name`,
       [plant.id]
     );
-    const article = await fetchArticle(plant.id);
+    const [gallery, article, similar, idealNeighbors] = await Promise.all([
+      fetchGallery(plant.id),
+      fetchArticle(plant.id),
+      fetchSimilarPlants(plant),
+      fetchIdealNeighbors(plant),
+    ]);
     res.json({
       plant: { ...plant, tags: tags.rows },
-      gallery: gallery.rows,
+      gallery,
       article,
-      redirect_slug: isNumeric ? plant.slug : null,
+      similar,
+      ideal_neighbors: idealNeighbors,
+      redirect_slug: numeric && !resolvedViaSlug ? plant.slug : null,
     });
   } catch (error) {
     console.error("GET /api/plants/:identifier", error);
@@ -605,7 +919,8 @@ function nullableText(value) {
 
 function toNullableInt(value) {
   const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
 }
 
 function toNullableMonth(value) {
@@ -676,6 +991,11 @@ function buildFilterClauses(query, params) {
       clauses.push(`${column} = ANY($${params.length}::int[])`);
     }
   }
+  const categoryFilter = parseIntArray(query.category);
+  if (categoryFilter.length) {
+    params.push(categoryFilter);
+    clauses.push(`p.category_id = ANY($${params.length}::int[])`);
+  }
   const bloom = parseIntArray(query.bloom);
   if (bloom.length) {
     params.push(bloom);
@@ -714,7 +1034,134 @@ function buildFilterClauses(query, params) {
       `EXISTS (SELECT 1 FROM plant_tag_map pt WHERE pt.plant_id = p.id AND pt.tag_id = ANY($${params.length}::int[]))`
     );
   }
+  if (parseBoolean(query.with_photo)) {
+    clauses.push("p.main_image_url IS NOT NULL");
+  }
+  if (parseBoolean(query.without_article)) {
+    clauses.push(
+      `NOT EXISTS (
+        SELECT 1
+        FROM plant_articles pa
+        WHERE pa.plant_id = p.id
+          AND COALESCE(pa.content_text, '') <> ''
+      )`
+    );
+  }
+  const collectionClause = buildCollectionClause(query.collection, params);
+  if (collectionClause) {
+    clauses.push(collectionClause);
+  }
   return clauses;
+}
+
+async function getPlantsSettings() {
+  const rows = await pool.query("SELECT key, value FROM plants_settings");
+  return rows.rows.reduce((acc, row) => {
+    acc[row.key] = row.value;
+    return acc;
+  }, {});
+}
+
+async function savePlantsSettings(settings = {}) {
+  const entries = Object.entries(settings);
+  if (!entries.length) return;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const [key, value] of entries) {
+      await client.query(
+        `INSERT INTO plants_settings (key, value)
+         VALUES ($1,$2)
+         ON CONFLICT (key)
+         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [key, value]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function userCanManagePlants(userId) {
+  if (!userId) return false;
+  const userRow = await pool.query("SELECT role FROM users WHERE id = $1", [userId]);
+  if (userRow.rows[0]?.role === "ALL") return true;
+  const permRow = await pool.query(
+    "SELECT 1 FROM user_permissions WHERE user_id = $1 AND perm_key = $2 LIMIT 1",
+    [userId, "plants_admin"]
+  );
+  return permRow.rows.length > 0;
+}
+
+async function fetchGallery(plantId) {
+  const q = await pool.query(
+    `SELECT id, image_url, preview_url, "order"
+     FROM plant_images
+     WHERE plant_id = $1
+     ORDER BY "order" ASC NULLS LAST, created_at ASC`,
+    [plantId]
+  );
+  return q.rows;
+}
+
+async function fetchSimilarPlants(plant, limit = 5) {
+  const clauses = [];
+  const params = [plant.id];
+  const family = String(plant.family || "").trim().toLowerCase();
+  if (family) {
+    params.push(family);
+    clauses.push(`LOWER(p.family) = $${params.length}`);
+  }
+  const numericFields = [
+    { key: "light_id", column: "p.light_id" },
+    { key: "humidity_id", column: "p.humidity_id" },
+    { key: "watering_id", column: "p.watering_id" },
+  ];
+  for (const field of numericFields) {
+    if (plant[field.key]) {
+      params.push(plant[field.key]);
+      clauses.push(`${field.column} = $${params.length}`);
+    }
+  }
+  if (!clauses.length) return [];
+  params.push(limit);
+  const q = await pool.query(
+    `
+    SELECT p.id, p.slug, p.common_name, p.main_image_url, p.main_preview_url, dc.name AS category
+    FROM plants p
+    LEFT JOIN dict_categories dc ON p.category_id = dc.id
+    WHERE p.id <> $1
+      AND p.is_published = TRUE
+      AND (${clauses.join(" OR ")})
+    ORDER BY RANDOM()
+    LIMIT $${params.length}
+    `,
+    params
+  );
+  return q.rows;
+}
+
+async function fetchIdealNeighbors(plant, limit = 3) {
+  if (!plant.light_id || !plant.humidity_id || !plant.watering_id) return [];
+  const q = await pool.query(
+    `
+    SELECT p.id, p.slug, p.common_name
+    FROM plants p
+    WHERE p.id <> $1
+      AND p.is_published = TRUE
+      AND p.light_id = $2
+      AND p.humidity_id = $3
+      AND p.watering_id = $4
+    ORDER BY RANDOM()
+    LIMIT $5
+    `,
+    [plant.id, plant.light_id, plant.humidity_id, plant.watering_id, limit]
+  );
+  return q.rows;
 }
 
 async function fetchDict(table) {
@@ -771,7 +1218,8 @@ async function fetchPlantDetail({ id, slug }) {
       CASE WHEN ds.id IS NULL THEN NULL ELSE jsonb_build_object('id', ds.id, 'name', ds.name) END AS soil,
       CASE WHEN dh.id IS NULL THEN NULL ELSE jsonb_build_object('id', dh.id, 'name', dh.name) END AS humidity,
       CASE WHEN dt.id IS NULL THEN NULL ELSE jsonb_build_object('id', dt.id, 'name', dt.name) END AS temperature,
-      CASE WHEN dlc.id IS NULL THEN NULL ELSE jsonb_build_object('id', dlc.id, 'name', dlc.name) END AS location
+      CASE WHEN dlc.id IS NULL THEN NULL ELSE jsonb_build_object('id', dlc.id, 'name', dlc.name) END AS location,
+      CASE WHEN dc.id IS NULL THEN NULL ELSE jsonb_build_object('id', dc.id, 'name', dc.name) END AS category
     FROM plants p
     LEFT JOIN dict_light dl ON p.light_id = dl.id
     LEFT JOIN dict_watering dw ON p.watering_id = dw.id
@@ -779,6 +1227,7 @@ async function fetchPlantDetail({ id, slug }) {
     LEFT JOIN dict_humidity dh ON p.humidity_id = dh.id
     LEFT JOIN dict_temperature dt ON p.temperature_id = dt.id
     LEFT JOIN dict_locations dlc ON p.location_id = dlc.id
+    LEFT JOIN dict_categories dc ON p.category_id = dc.id
     WHERE ${where}
     LIMIT 1
     `,
@@ -791,9 +1240,15 @@ async function fetchPlantDetail({ id, slug }) {
 }
 
 async function resolvePlantId(identifier) {
-  if (/^\d+$/.test(identifier)) return Number(identifier);
-  const q = await pool.query("SELECT id FROM plants WHERE slug = $1", [identifier]);
-  return q.rows[0]?.id || null;
+  if (!identifier) return null;
+  const slugQuery = await pool.query("SELECT id FROM plants WHERE slug = $1", [identifier]);
+  if (slugQuery.rows.length) return slugQuery.rows[0].id;
+  if (/^\d+$/.test(identifier)) {
+    const id = Number(identifier);
+    const exists = await pool.query("SELECT id FROM plants WHERE id = $1", [id]);
+    return exists.rows[0]?.id || null;
+  }
+  return null;
 }
 
 async function fetchArticle(plantId) {
@@ -809,6 +1264,43 @@ async function fetchArticle(plantId) {
     updated_by: null,
     updated_at: null,
   };
+}
+
+async function recordHistoryEntries(plantId, userId, entries) {
+  if (!entries?.length) return;
+  const values = [];
+  const params = [];
+  entries.forEach((entry, idx) => {
+    const offset = idx * 5;
+    values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`);
+    params.push(
+      plantId,
+      userId || null,
+      entry.field,
+      historyValue(entry.oldValue),
+      historyValue(entry.newValue)
+    );
+  });
+  await pool.query(
+    `INSERT INTO plants_history (plant_id, user_id, field, old_value, new_value)
+     VALUES ${values.join(", ")}`,
+    params
+  );
+}
+
+function historyValue(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function valuesEqual(a, b) {
+  if (a === null || a === undefined) return b === null || b === undefined;
+  if (b === null || b === undefined) return false;
+  if (typeof a === "object" || typeof b === "object") {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  return String(a) === String(b);
 }
 
 function getExtension(file) {
@@ -831,4 +1323,77 @@ function validationError(message) {
   const err = new Error(message);
   err.status = 400;
   return err;
+}
+
+function toBooleanFlag(value) {
+  if (value === null || value === undefined || value === "") return false;
+  if (typeof value === "boolean") return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "y", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "n", "off"].includes(normalized)) return false;
+  return Boolean(value);
+}
+
+function parseBoolean(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return false;
+  return ["1", "true", "yes", "y", "on"].includes(normalized);
+}
+
+function buildCollectionClause(collection, params) {
+  if (!collection) return null;
+  const key = String(collection || "").trim().toLowerCase();
+  switch (key) {
+    case "easy": {
+      params.push("%умер%");
+      const moderate = params.length;
+      params.push("%редк%");
+      const rare = params.length;
+      return `(p.watering_id IN (
+        SELECT id FROM dict_watering WHERE name ILIKE $${moderate} OR name ILIKE $${rare}
+      ))`;
+    }
+    case "bedroom": {
+      params.push("%спал%");
+      const bedroom = params.length;
+      params.push("%bed%");
+      const bed = params.length;
+      return `(p.location_id IN (
+        SELECT id FROM dict_locations WHERE name ILIKE $${bedroom} OR name ILIKE $${bed}
+      ))`;
+    }
+    case "winter_bloom":
+      return "(p.blooming_month IS NOT NULL AND p.blooming_month IN (12,1,2))";
+    case "non_toxic":
+      return `(
+        COALESCE(p.toxicity_for_cats_level, 0) <= 1
+        AND COALESCE(p.toxicity_for_dogs_level, 0) <= 1
+        AND COALESCE(p.toxicity_for_humans_level, 0) <= 1
+      )`;
+    default:
+      return null;
+  }
+}
+
+function normalizeUrl(value) {
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    return url.toString();
+  } catch {
+    throw validationError("Invalid URL");
+  }
+}
+
+async function safeReadJson(response) {
+  try {
+    const data = await response.json();
+    return data?.message || null;
+  } catch {
+    return null;
+  }
 }
