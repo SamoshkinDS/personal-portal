@@ -25,60 +25,59 @@ export default function Header({ title, actions, onLogout, onMenuToggle, showMen
     else logout();
   };
 
-  const handleHomeClick = (event) => {
-    event.preventDefault();
-    if (window.history && window.history.pushState) {
-      window.history.pushState({}, "", "/");
-      window.dispatchEvent(new PopStateEvent("popstate"));
-    } else {
-      window.location.href = "/";
-    }
-  };
-
   return (
     <>
       <motion.header
-        className={`header sticky top-0 z-20 flex flex-col gap-4 rounded-3xl bg-white/85 px-4 py-4 text-gray-900 ${
-          elevated ? "shadow-md" : "shadow-sm"
-        } backdrop-blur transition-colors duration-500 dark:bg-slate-900/80 dark:text-gray-100 sm:flex-row sm:items-center sm:justify-between sm:px-5`}
+        className={`header sticky top-0 z-20 flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/85 px-4 py-4 text-gray-900 ${
+          elevated ? "shadow-lg" : "shadow-sm"
+        } backdrop-blur transition-colors duration-500 dark:border-slate-700/70 dark:bg-slate-900/80 dark:text-gray-100 sm:px-5`}
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, ease: "easeOut" }}
       >
-        <div className="flex items-center gap-3">
-          {showMenuButton && (
-            <button
-              type="button"
-              onClick={onMenuToggle}
-              className="sm:hidden inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 text-gray-700 ring-1 ring-black/5 transition hover:bg-white dark:bg-slate-800/70 dark:text-gray-200 dark:hover:bg-slate-800"
-              aria-label="Показать меню"
-            >
-              <span className="block h-0.5 w-5 bg-current" />
-              <span className="block h-0.5 w-5 bg-current" />
-              <span className="block h-0.5 w-5 bg-current" />
-            </button>
-          )}
-          <Logo showName={false} size="md" className="sm:hidden" />
-          <a
-            href="/"
-            onClick={handleHomeClick}
-            className="hidden"
-            title="На главную"
-            aria-label="На главную"
-          >
-            <span className="font-black text-lg tracking-wide">S</span>
-          </a>
-          <div>
-            <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">{title}</h1>
-            {user && (
-              <p className="mt-1 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Пользователь: {user.username}
-              </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            {showMenuButton && (
+              <button
+                type="button"
+                onClick={onMenuToggle}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 text-gray-700 ring-1 ring-black/5 transition hover:bg-white dark:bg-slate-800/70 dark:text-gray-200 dark:hover:bg-slate-800 lg:hidden"
+                aria-label="Показать меню"
+              >
+                <span className="block h-0.5 w-5 bg-current" />
+                <span className="block h-0.5 w-5 bg-current" />
+                <span className="block h-0.5 w-5 bg-current" />
+              </button>
             )}
+            <Logo showName={false} size="md" className="lg:hidden" />
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                Рабочая область
+              </span>
+              <h1 className="mt-1 text-2xl font-semibold leading-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
+                {title}
+              </h1>
+            </div>
           </div>
+
+          {user && (
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-2 shadow-sm transition dark:border-slate-700/60 dark:bg-slate-800/70">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-base font-semibold text-blue-600 dark:bg-blue-500/15 dark:text-blue-200">
+                {(user.username || "U").slice(0, 2).toUpperCase()}
+              </span>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{user.username}</span>
+                {user.role && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Роль <span className="font-medium text-slate-700 dark:text-slate-200">{user.role}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap items-center justify-between gap-3 lg:justify-end">
           <div className="relative">
             <button
               type="button"

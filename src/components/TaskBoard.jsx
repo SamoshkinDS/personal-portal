@@ -1,6 +1,18 @@
 // encoding: utf-8
 import React from "react";
 import toast from "react-hot-toast";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  closestCorners,
+  useDroppable,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, rectSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { restrictToWindowEdges } from "@dnd-kit/modifiers";
 import { apiAuthFetch } from "../utils/api.js";
 import Modal from "./Modal.jsx";
 
@@ -124,35 +136,6 @@ function computeReorder(prevTasks, lists, taskId, targetListId, targetIndex) {
   return { updatedTasks, changedLists: Array.from(changedLists) };
 }
 
-function DropMarker({ listId, index, dragState, setDragState, onDrop }) {
-  const isActive = dragState.taskId && dragState.listId === listId && dragState.index === index;
-
-  const allow = (event) => {
-    if (!dragState.taskId) return;
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-    if (!isActive) {
-      setDragState((prev) => ({ ...prev, listId, index }));
-    }
-  };
-
-  const handleDrop = (event) => {
-    if (!dragState.taskId) return;
-    event.preventDefault();
-    onDrop(listId, index);
-    setDragState({ taskId: null, listId: null, index: null });
-  };
-
-  return (
-    <div
-      onDragOver={allow}
-      onDragEnter={allow}
-      onDrop={handleDrop}
-      className={`h-2 w-full rounded-full transition-colors ${isActive ? "bg-blue-400/70" : "bg-transparent"}`}
-    />
-  );
-}
-
 function IconButton({ onClick, title, variant = "ghost", children }) {
   const base = "flex h-8 w-8 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2";
   const styles = {
@@ -167,17 +150,24 @@ function IconButton({ onClick, title, variant = "ghost", children }) {
   );
 }
 
-function TaskCard({ task, onDragStart, onDragEnd, onToggleDone, onEdit, onDelete }) {
+const TaskCard = React.forwardRef(function TaskCard(
+  { task, dragAttributes, dragListeners, onToggleDone, onEdit, onDelete, isDragging = false, style, showActions = true, isOverlay = false },
+  ref
+) {
   const dueSoon = task.due_at ? new Date(task.due_at).getTime() < Date.now() : false;
   return (
     <article
-      className={`group relative flex cursor-grab flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm shadow-sm transition duration-150 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/60 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-blue-400/40 dark:hover:bg-slate-800/90 ${task.done ? "opacity-80" : ""}`}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      ref={ref}
+      style={style}
+      {...dragAttributes}
+      className={`group relative flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm shadow-sm transition duration-150 ${
+        isDragging ? "cursor-grabbing ring-2 ring-blue-400 shadow-xl" : "cursor-grab hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/60 hover:shadow-md"
+      } dark:border-slate-700 dark:bg-slate-800 dark:hover:border-blue-400/40 dark:hover:bg-slate-800/90 ${
+        task.done ? "opacity-80" : ""
+      } ${isOverlay ? "pointer-events-none" : ""}`}
     >
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex-none text-slate-400" data-dnd-ignore="true">
+        <div className="mt-0.5 flex-none text-slate-400" data-dnd-ignore="true" {...dragListeners}>
           <IconGrip />
         </div>
         <div className="flex-1 space-y-1">
@@ -195,23 +185,181 @@ function TaskCard({ task, onDragStart, onDragEnd, onToggleDone, onEdit, onDelete
             </span>
           </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <IconButton
-            onClick={onToggleDone}
-            title={task.done ? "Снять выполнение" : "Отметить выполненной"}
-            variant={task.done ? "success" : "ghost"}
-          >
-            {task.done ? <IconCheck /> : <IconCircle />}
-          </IconButton>
-          <IconButton onClick={onEdit} title="Редактировать">
-            <IconEdit />
-          </IconButton>
-          <IconButton onClick={onDelete} title="Удалить" variant="danger">
-            <IconTrash />
-          </IconButton>
-        </div>
+        {showActions && (
+          <div className="flex flex-col gap-1">
+            <IconButton
+              onClick={onToggleDone}
+              title={task.done ? "Снять выполнение" : "Отметить выполненной"}
+              variant={task.done ? "success" : "ghost"}
+            >
+              {task.done ? <IconCheck /> : <IconCircle />}
+            </IconButton>
+            <IconButton onClick={onEdit} title="Редактировать">
+              <IconEdit />
+            </IconButton>
+            <IconButton onClick={onDelete} title="Удалить" variant="danger">
+              <IconTrash />
+            </IconButton>
+          </div>
+        )}
       </div>
     </article>
+  );
+});
+
+TaskCard.displayName = "TaskCard";
+
+const sortTasksByPosition = (tasks) =>
+  [...tasks].sort((a, b) => {
+    if (a.position !== b.position) return a.position - b.position;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
+const getVisibleTasksForList = (allTasks, listId, showCompleted, hiddenCompleted) => {
+  const sorted = sortTasksByPosition(allTasks.filter((task) => task.list_id === listId));
+  return sorted.filter((task) => !(task.done && !showCompleted && hiddenCompleted.has(task.id)));
+};
+
+function SortableTaskCard({ task, listId, onToggleDone, onEdit, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    data: { type: "task", listId },
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <TaskCard
+      ref={setNodeRef}
+      task={task}
+      dragAttributes={attributes}
+      dragListeners={listeners}
+      onToggleDone={onToggleDone}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      isDragging={isDragging}
+      style={style}
+    />
+  );
+}
+
+function TaskColumn({
+  list,
+  visibleTasks,
+  totalTasks,
+  editingListId,
+  editingListTitle,
+  onChangeListTitle,
+  onStartRename,
+  onRenameList,
+  onCancelRename,
+  onDeleteList,
+  taskDraft,
+  onTaskDraftChange,
+  onCreateTask,
+  onToggleDone,
+  onEditTask,
+  onDeleteTask,
+  showCompleted,
+  hiddenCompletedCount,
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `list-${list.id}`,
+    data: { type: "list", listId: list.id },
+  });
+
+  return (
+    <div
+      className={`flex w-[340px] flex-shrink-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm transition duration-200 hover:border-blue-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/80 ${
+        isOver ? "border-blue-300 shadow-lg dark:border-blue-400/60" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        {editingListId === list.id ? (
+          <form
+            className="flex w-full items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onRenameList();
+            }}
+          >
+            <input
+              value={editingListTitle}
+              onChange={(event) => onChangeListTitle(event.target.value)}
+              className="h-8 flex-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              autoFocus
+            />
+            <button type="submit" className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+              Сохранить
+            </button>
+            <button
+              type="button"
+              onClick={onCancelRename}
+              className="text-xs text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+            >
+              Отмена
+            </button>
+          </form>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{list.title}</h3>
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500">{totalTasks.length} задач</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <IconButton onClick={onStartRename} title="Переименовать">
+                <IconRename />
+              </IconButton>
+              <IconButton onClick={onDeleteList} title="Удалить колонку" variant="danger">
+                <IconTrash />
+              </IconButton>
+            </div>
+          </>
+        )}
+      </div>
+      <SortableContext items={visibleTasks.map((task) => task.id)} strategy={rectSortingStrategy}>
+        <div
+          ref={setNodeRef}
+          className="flex max-h-[520px] flex-1 flex-col gap-2 overflow-y-auto pr-1"
+        >
+          {visibleTasks.map((task) => (
+            <SortableTaskCard
+              key={task.id}
+              task={task}
+              listId={list.id}
+              onToggleDone={() => onToggleDone(task)}
+              onEdit={() => onEditTask(task)}
+              onDelete={() => onDeleteTask(task)}
+            />
+          ))}
+          {visibleTasks.length === 0 && (
+            <div className="flex min-h-[80px] flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-3 text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500">
+              {showCompleted ? "Нет задач" : hiddenCompletedCount > 0 ? "Все задачи выполнены" : "Нет задач"}
+            </div>
+          )}
+        </div>
+      </SortableContext>
+      {!showCompleted && hiddenCompletedCount > 0 && (
+        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          Скрыто выполненных: {hiddenCompletedCount}
+        </div>
+      )}
+      <form onSubmit={onCreateTask} className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+        <textarea
+          value={taskDraft}
+          onChange={(event) => onTaskDraftChange(event.target.value)}
+          placeholder="Добавить задачу"
+          className="min-h-[54px] resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+        />
+        <button
+          type="submit"
+          className="self-start rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        >
+          Добавить
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -229,7 +377,16 @@ export default function TaskBoard() {
   const [editingListId, setEditingListId] = React.useState(null);
   const [editingListTitle, setEditingListTitle] = React.useState("");
   const [editingTask, setEditingTask] = React.useState(null);
-  const [dragState, setDragState] = React.useState({ taskId: null, listId: null, index: null });
+  const [taskToDelete, setTaskToDelete] = React.useState(null);
+  const [deleteLoading, setDeleteLoading] = React.useState(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    })
+  );
+  const [activeTaskId, setActiveTaskId] = React.useState(null);
+  const dragSnapshotRef = React.useRef(null);
+  const pendingPersistRef = React.useRef(null);
 
   const clearHideTimer = React.useCallback((taskId) => {
     const timer = hideTimersRef.current.get(taskId);
@@ -417,18 +574,32 @@ export default function TaskBoard() {
     }
   };
 
-  const handleDeleteTask = async (taskId) => {
-    if (!window.confirm("Удалить задачу?")) return;
+  const requestDeleteTask = React.useCallback((task) => {
+    setTaskToDelete(task);
+  }, []);
+
+  const confirmDeleteTask = React.useCallback(async () => {
+    if (!taskToDelete) return;
+    setDeleteLoading(true);
+    const taskId = taskToDelete.id;
     try {
       const res = await apiAuthFetch(`/api/todos/${taskId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
       toast.success("Задача удалена");
+      setTaskToDelete(null);
       await loadBoard();
     } catch (error) {
       console.error(error);
       toast.error("Не удалось удалить задачу");
+    } finally {
+      setDeleteLoading(false);
     }
-  };
+  }, [loadBoard, taskToDelete]);
+
+  const cancelDeleteTask = React.useCallback(() => {
+    if (deleteLoading) return;
+    setTaskToDelete(null);
+  }, [deleteLoading]);
 
   const handleToggleDone = async (task) => {
     const nextDone = !task.done;
@@ -503,12 +674,170 @@ export default function TaskBoard() {
       if (!map.has(task.list_id)) map.set(task.list_id, []);
       map.get(task.list_id).push(task);
     });
-    map.forEach((arr) => arr.sort((a, b) => {
-      if (a.position !== b.position) return a.position - b.position;
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    }));
+    map.forEach((arr, key) => {
+      map.set(key, sortTasksByPosition(arr));
+    });
     return map;
   }, [lists, tasks]);
+
+  const activeTask = React.useMemo(() => tasks.find((item) => item.id === activeTaskId) || null, [activeTaskId, tasks]);
+
+  const applyReorder = React.useCallback(
+    (taskId, targetListId, targetIndex, shouldPersist) => {
+      setTasks((prev) => {
+        const result = computeReorder(prev, lists, taskId, targetListId, targetIndex);
+        if (!result) {
+          if (shouldPersist) {
+            if (pendingPersistRef.current && pendingPersistRef.current.changedLists?.size) {
+              const changed = Array.from(pendingPersistRef.current.changedLists);
+              pendingPersistRef.current = null;
+              persistTaskOrder(prev, changed).catch((error) => console.error(error));
+            } else {
+              pendingPersistRef.current = null;
+            }
+          }
+          return prev;
+        }
+
+        if (!shouldPersist) {
+          if (!pendingPersistRef.current) {
+            pendingPersistRef.current = { changedLists: new Set(result.changedLists) };
+          } else {
+            result.changedLists.forEach((id) => pendingPersistRef.current.changedLists.add(id));
+          }
+        } else {
+          const mergedSet = new Set(result.changedLists);
+          if (pendingPersistRef.current && pendingPersistRef.current.changedLists) {
+            pendingPersistRef.current.changedLists.forEach((id) => mergedSet.add(id));
+          }
+          pendingPersistRef.current = null;
+          persistTaskOrder(result.updatedTasks, Array.from(mergedSet)).catch((error) => console.error(error));
+        }
+
+        return result.updatedTasks;
+      });
+    },
+    [lists, persistTaskOrder]
+  );
+
+  const handleDragStart = React.useCallback(
+    (event) => {
+      const { active } = event;
+      if (active?.data?.current?.type !== "task") return;
+      setActiveTaskId(active.id);
+      dragSnapshotRef.current = tasks.map((item) => ({ ...item }));
+      pendingPersistRef.current = { changedLists: new Set() };
+    },
+    [tasks]
+  );
+
+  const handleDragOver = React.useCallback(
+    (event) => {
+      const { active, over } = event;
+      if (!over || active?.data?.current?.type !== "task") return;
+      const overData = over.data.current;
+      if (!overData) return;
+
+      const targetListId = overData.listId;
+      if (!targetListId) return;
+
+      let targetIndex;
+      if (overData.type === "task") {
+        const targetVisible = getVisibleTasksForList(tasks, targetListId, showCompleted, hiddenCompleted);
+        const overIndex = targetVisible.findIndex((task) => task.id === over.id);
+        targetIndex = overIndex === -1 ? targetVisible.length : overIndex;
+      } else if (overData.type === "list") {
+        const targetVisible = getVisibleTasksForList(tasks, targetListId, showCompleted, hiddenCompleted);
+        targetIndex = targetVisible.length;
+      } else {
+        return;
+      }
+
+      const currentTask = tasks.find((task) => task.id === active.id);
+      if (!currentTask) return;
+
+      const currentVisible = getVisibleTasksForList(tasks, currentTask.list_id, showCompleted, hiddenCompleted);
+      const currentIndex = currentVisible.findIndex((task) => task.id === active.id);
+
+      if (currentTask.list_id === targetListId && currentIndex === targetIndex) {
+        return;
+      }
+
+      applyReorder(active.id, targetListId, targetIndex, false);
+      if (active.data?.current) {
+        active.data.current.listId = targetListId;
+      }
+    },
+    [applyReorder, tasks, showCompleted, hiddenCompleted]
+  );
+
+  const handleDragEnd = React.useCallback(
+    (event) => {
+      const { active, over } = event;
+      if (active?.data?.current?.type !== "task") {
+        setActiveTaskId(null);
+        pendingPersistRef.current = null;
+        dragSnapshotRef.current = null;
+        return;
+      }
+
+      if (!over) {
+        if (dragSnapshotRef.current) {
+          setTasks(dragSnapshotRef.current);
+        }
+        setActiveTaskId(null);
+        pendingPersistRef.current = null;
+        dragSnapshotRef.current = null;
+        return;
+      }
+
+      const overData = over.data.current;
+      if (!overData) {
+        setActiveTaskId(null);
+        pendingPersistRef.current = null;
+        dragSnapshotRef.current = null;
+        return;
+      }
+
+      const targetListId = overData.listId;
+      if (!targetListId) {
+        setActiveTaskId(null);
+        pendingPersistRef.current = null;
+        dragSnapshotRef.current = null;
+        return;
+      }
+
+      let targetIndex;
+      if (overData.type === "task") {
+        const targetVisible = getVisibleTasksForList(tasks, targetListId, showCompleted, hiddenCompleted);
+        const overIndex = targetVisible.findIndex((task) => task.id === over.id);
+        targetIndex = overIndex === -1 ? targetVisible.length : overIndex;
+      } else if (overData.type === "list") {
+        const targetVisible = getVisibleTasksForList(tasks, targetListId, showCompleted, hiddenCompleted);
+        targetIndex = targetVisible.length;
+      } else {
+        setActiveTaskId(null);
+        pendingPersistRef.current = null;
+        dragSnapshotRef.current = null;
+        return;
+      }
+
+      applyReorder(active.id, targetListId, targetIndex, true);
+      setActiveTaskId(null);
+      dragSnapshotRef.current = null;
+      pendingPersistRef.current = null;
+    },
+    [applyReorder, tasks, showCompleted, hiddenCompleted]
+  );
+
+  const handleDragCancel = React.useCallback(() => {
+    setActiveTaskId(null);
+    if (dragSnapshotRef.current) {
+      setTasks(dragSnapshotRef.current);
+    }
+    dragSnapshotRef.current = null;
+    pendingPersistRef.current = null;
+  }, []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -549,126 +878,118 @@ export default function TaskBoard() {
           {error}
         </div>
       )}
-      <div className="custom-scrollbar -mx-2 overflow-x-auto px-2 pb-2">
-        {loading ? (
-          <div className="flex h-48 items-center justify-center text-slate-400 dark:text-slate-500">Загрузка…</div>
-        ) : (
-          <div className="flex min-h-[300px] gap-5 pb-2">
-            {lists.map((list) => {
-              const listTasks = groupedTasks.get(list.id) || [];
-              return (
-                <div
-                  key={list.id}
-                  className="flex w-[340px] flex-shrink-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/80"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    {editingListId === list.id ? (
-                      <form
-                        className="flex w-full items-center gap-2"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          handleRenameList(list.id);
-                        }}
-                      >
-                        <input
-                          value={editingListTitle}
-                          onChange={(event) => setEditingListTitle(event.target.value)}
-                          className="h-8 flex-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                          autoFocus
-                        />
-                        <button type="submit" className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">Сохранить</button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingListId(null);
-                            setEditingListTitle("");
-                          }}
-                          className="text-xs text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                        >
-                          Отмена
-                        </button>
-                      </form>
-                    ) : (
-                      <>
-                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{list.title}</h3>
-                        <div className="flex items-center gap-1">
-                          <IconButton
-                            onClick={() => {
-                              setEditingListId(list.id);
-                              setEditingListTitle(list.title);
-                            }}
-                            title="Переименовать"
-                          >
-                            <IconRename />
-                          </IconButton>
-                          <IconButton onClick={() => handleDeleteList(list.id)} title="Удалить колонку" variant="danger">
-                            <IconTrash />
-                          </IconButton>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex max-h-[520px] flex-1 flex-col gap-2 overflow-y-auto pr-1">
-                    <DropMarker
-                      listId={list.id}
-                      index={0}
-                      dragState={dragState}
-                      setDragState={setDragState}
-                      onDrop={(targetListId, idx) => moveTask(dragState.taskId, targetListId, idx)}
-                    />
-                    {listTasks.map((task, index) => {
-                      const shouldHide = task.done && !showCompleted && hiddenCompleted.has(task.id);
-                      const markerIndex = index + 1;
-                      return (
-                        <React.Fragment key={task.id}>
-                          {!shouldHide && (
-                            <TaskCard
-                              task={task}
-                              onDragStart={(event) => {
-                                event.dataTransfer.effectAllowed = "move";
-                                event.dataTransfer.setData("text/plain", String(task.id));
-                                try {
-                                  event.dataTransfer.setDragImage(event.currentTarget, event.currentTarget.offsetWidth / 2, 14);
-                                } catch {}
-                                setDragState({ taskId: task.id, listId: list.id, index });
-                              }}
-                              onDragEnd={() => setDragState({ taskId: null, listId: null, index: null })}
-                              onToggleDone={() => handleToggleDone(task)}
-                              onEdit={() => setEditingTask({ task, text: task.text, dueAt: toInputDateTime(task.due_at) })}
-                              onDelete={() => handleDeleteTask(task.id)}
-                            />
-                          )}
-                          <DropMarker
-                            listId={list.id}
-                            index={markerIndex}
-                            dragState={dragState}
-                            setDragState={setDragState}
-                            onDrop={(targetListId, idx) => moveTask(dragState.taskId, targetListId, idx)}
-                          />
-                        </React.Fragment>
-                      );
-                    })}
-                  </div>
-                  <form onSubmit={(event) => handleCreateTask(event, list.id)} className="flex flex-col gap-2 border-t border-slate-100 pt-3">
-                    <textarea
-                      value={taskDrafts[list.id] || ""}
-                      onChange={(event) => setTaskDrafts((prev) => ({ ...prev, [list.id]: event.target.value }))}
-                      placeholder="Добавить задачу"
-                      className="min-h-[54px] resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                    />
-                    <button
-                      type="submit"
-                      className="self-start rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                    >
-                      Добавить
-                    </button>
-                  </form>
-                </div>
-              );
-            })}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+        modifiers={[restrictToWindowEdges]}
+      >
+        <div className="custom-scrollbar -mx-2 overflow-x-auto px-2 pb-2">
+          {loading ? (
+            <div className="flex h-48 items-center justify-center text-slate-400 dark:text-slate-500">Загрузка…</div>
+          ) : (
+            <div className="flex min-h-[300px] gap-5 pb-2">
+              {lists.map((list) => {
+                const listTasks = groupedTasks.get(list.id) || [];
+                const visibleTasks = getVisibleTasksForList(tasks, list.id, showCompleted, hiddenCompleted);
+                const hiddenCompletedCount = showCompleted
+                  ? 0
+                  : listTasks.filter((task) => task.done && hiddenCompleted.has(task.id)).length;
+                return (
+                  <TaskColumn
+                    key={list.id}
+                    list={list}
+                    visibleTasks={visibleTasks}
+                    totalTasks={listTasks}
+                    editingListId={editingListId}
+                    editingListTitle={editingListTitle}
+                    onChangeListTitle={setEditingListTitle}
+                    onStartRename={() => {
+                      setEditingListId(list.id);
+                      setEditingListTitle(list.title);
+                    }}
+                    onRenameList={() => handleRenameList(list.id)}
+                    onCancelRename={() => {
+                      setEditingListId(null);
+                      setEditingListTitle("");
+                    }}
+                    onDeleteList={() => handleDeleteList(list.id)}
+                    taskDraft={taskDrafts[list.id] || ""}
+                    onTaskDraftChange={(value) =>
+                      setTaskDrafts((prev) => ({
+                        ...prev,
+                        [list.id]: value,
+                      }))
+                    }
+                    onCreateTask={(event) => handleCreateTask(event, list.id)}
+                    onToggleDone={handleToggleDone}
+                    onEditTask={(task) => setEditingTask({ task, text: task.text, dueAt: toInputDateTime(task.due_at) })}
+                    onDeleteTask={requestDeleteTask}
+                    showCompleted={showCompleted}
+                    hiddenCompletedCount={hiddenCompletedCount}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <DragOverlay modifiers={[restrictToWindowEdges]}>
+          {activeTask ? (
+            <TaskCard
+              task={activeTask}
+              onToggleDone={() => {}}
+              onEdit={() => {}}
+              onDelete={() => {}}
+              isDragging
+              isOverlay
+              showActions={false}
+            />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      <Modal
+        open={Boolean(taskToDelete)}
+        onClose={cancelDeleteTask}
+        title="Удалить задачу?"
+        maxWidth="max-w-md"
+      >
+        {taskToDelete && (
+          <div className="flex flex-col gap-5">
+            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-200">
+              Действие нельзя отменить. Задача будет удалена без возможности восстановления.
+            </div>
+            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <p className="font-semibold text-slate-800 dark:text-slate-100">{taskToDelete.text}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Создана: {formatDate(taskToDelete.created_at)}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelDeleteTask}
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500"
+                disabled={deleteLoading}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteTask}
+                className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:opacity-60"
+                disabled={deleteLoading}
+              >
+                {deleteLoading && <span className="h-2 w-2 animate-pulse rounded-full bg-white" />}
+                Удалить
+              </button>
+            </div>
           </div>
         )}
-      </div>
+      </Modal>
 
       <Modal
         open={Boolean(editingTask)}
