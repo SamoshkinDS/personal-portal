@@ -20,6 +20,7 @@ import plantsRoutes from "./routes/plants.js";
 import pestsRoutes from "./routes/pests.js";
 import diseasesRoutes from "./routes/diseases.js";
 import medicinesRoutes from "./routes/medicines.js";
+import problemsRoutes from "./routes/problems.js";
 import { pool } from "./db/connect.js";
 import { ensurePlantsSchema } from "./db/plantsSchema.js";
 import { ensureCareCatalogSchema } from "./db/careSchema.js";
@@ -60,6 +61,7 @@ app.use("/api/plants", plantsRoutes);
 app.use("/api/pests", pestsRoutes);
 app.use("/api/diseases", diseasesRoutes);
 app.use("/api/medicines", medicinesRoutes);
+app.use("/api/problems", problemsRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
 const ACCOUNTING_JOBS_ENABLED = String(process.env.ACCOUNTING_JOBS_DISABLED || "false").toLowerCase() !== "true";

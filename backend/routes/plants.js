@@ -1319,6 +1319,7 @@ async function fetchPlantProblems(plantId) {
       [plantId]
     ),
   ]);
+  const medicines = await fetchRecommendedMedicinesForPlant(plantId);
   return {
     pests: pests.rows.map((row) => ({
       id: row.id,
@@ -1337,8 +1338,32 @@ async function fetchPlantProblems(plantId) {
       description: row.description,
       reason: row.reason,
     })),
-    medicines: [],
+    medicines,
   };
+}
+
+async function fetchRecommendedMedicinesForPlant(plantId) {
+  const q = await pool.query(
+    `
+    SELECT DISTINCT m.id, m.slug, m.name, m.medicine_type, LOWER(m.name) AS sort_key
+    FROM medicines m
+    WHERE EXISTS (
+            SELECT 1
+            FROM pest_medicine pm
+            JOIN plant_pest pp ON pp.pest_id = pm.pest_id
+            WHERE pm.medicine_id = m.id AND pp.plant_id = $1
+          )
+       OR EXISTS (
+            SELECT 1
+            FROM disease_medicine dm
+            JOIN plant_disease pd ON pd.disease_id = dm.disease_id
+            WHERE dm.medicine_id = m.id AND pd.plant_id = $1
+          )
+    ORDER BY sort_key
+    `,
+    [plantId]
+  );
+  return q.rows.map(({ sort_key, ...rest }) => rest);
 }
 
 async function ensureProblemEntitiesExist(table, ids) {

@@ -85,6 +85,23 @@ const NAV = [
     ),
     children: [
       { id: "plants-list", path: "/plants", label: "Список растений" },
+          {
+            id: "plants-problems",
+            path: "/problems",
+            label: "Проблемы и решения",
+            icon: (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 21v-4" />
+                <path d="M8 21v-2" />
+                <path d="M12 21v-6" />
+                <path d="M16 21v-4" />
+                <path d="M20 21V8" />
+                <path d="M22 7 12 3 2 7" />
+                <path d="M18 17h4" />
+                <path d="M2 21h20" />
+              </svg>
+            ),
+          },
       {
         id: "plants-pests",
         path: "/pests",
@@ -215,7 +232,12 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
     vpn: location.pathname.startsWith("/vpn"),
     admin: location.pathname.startsWith("/admin"),
     accounting: location.pathname.startsWith("/accounting"),
-    plants: location.pathname.startsWith("/plants"),
+    plants:
+      location.pathname.startsWith("/plants") ||
+      location.pathname.startsWith("/pests") ||
+      location.pathname.startsWith("/diseases") ||
+      location.pathname.startsWith("/medicines") ||
+      location.pathname.startsWith("/problems"),
   });
 
   const role = user?.role || "NON_ADMIN";

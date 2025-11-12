@@ -11,6 +11,7 @@ import { plantsApi } from "../../api/plants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
 import PlantProblemsSection from "../../components/plants/PlantProblemsSection.jsx";
+import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 
 const EMPTY_DOC = { type: "doc", content: [] };
 const MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -249,6 +250,12 @@ export default function PlantDetail() {
 
   return (
     <PageShell title={plant ? plant.common_name : "Карточка растения"} contentClassName="flex flex-col gap-6">
+      <PlantsBreadcrumbs
+        items={[
+          { label: "Растения", to: "/plants" },
+          { label: plant ? plant.common_name : "Карточка" },
+        ]}
+      />
       {loading ? (
         <div className="h-64 animate-pulse rounded-3xl border border-slate-100 bg-white/80 dark:border-white/10 dark:bg-slate-900/40" />
       ) : error ? (

@@ -47,6 +47,7 @@ import DiseasesList from "./pages/care/DiseasesList.jsx";
 import DiseaseDetail from "./pages/care/DiseaseDetail.jsx";
 import MedicinesList from "./pages/care/MedicinesList.jsx";
 import MedicineDetail from "./pages/care/MedicineDetail.jsx";
+import ProblemsOverview from "./pages/care/ProblemsOverview.jsx";
 import { useEffect } from "react";
 import { registerPush } from "./push/registerPush.js";
 
@@ -236,6 +237,14 @@ function AppRoutes() {
                       element={
                         <RouteTransition>
                           <PlantDetail />
+                        </RouteTransition>
+                      }
+                    />
+                    <Route
+                      path="/problems"
+                      element={
+                        <RouteTransition>
+                          <ProblemsOverview />
                         </RouteTransition>
                       }
                     />

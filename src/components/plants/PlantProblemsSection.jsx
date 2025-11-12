@@ -107,7 +107,7 @@ function ProblemsBlock({ plantId }) {
   );
 
   const list = data[activeTab] || [];
-  const emptyState = !data.pests.length && !data.diseases.length;
+  const emptyState = !data.pests.length && !data.diseases.length && !data.medicines.length;
 
   return (
     <section className="space-y-4 rounded-3xl border border-slate-100 bg-white/90 p-5 shadow-sm dark:border-white/10 dark:bg-slate-900/60">
@@ -165,9 +165,17 @@ function ProblemsBlock({ plantId }) {
           Для этого растения пока не зафиксированы вредители или болезни
         </div>
       ) : activeTab === "medicines" ? (
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-slate-800/40 dark:text-slate-300">
-          Список лекарств формируется автоматически на этапе 3.3 на основе привязанных вредителей и заболеваний.
-        </div>
+        list.length ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            {list.map((item) => (
+              <MedicineCard key={item.id} medicine={item} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-slate-800/40 dark:text-slate-300">
+            Для выбранного растения пока нет рекомендованных лекарств.
+          </div>
+        )
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((item) => (
@@ -394,4 +402,20 @@ function dangerClass(level) {
     default:
       return "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200";
   }
+}
+
+function MedicineCard({ medicine }) {
+  return (
+    <Link
+      to={`/medicines/${medicine.slug}`}
+      className="group relative flex flex-col gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-800 transition hover:border-emerald-300 hover:bg-white hover:text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/10 dark:text-emerald-100 dark:hover:border-emerald-400/60"
+      title={medicine.medicine_type || "Тип препарата"}
+    >
+      <span className="absolute right-3 top-3 text-xl">💊</span>
+      <p className="text-base font-semibold text-emerald-700 transition group-hover:text-emerald-900 dark:text-emerald-100 dark:group-hover:text-white">{medicine.name}</p>
+      <span className="inline-flex w-fit rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-white/10 dark:text-emerald-100">
+        {medicine.medicine_type || "Тип не указан"}
+      </span>
+    </Link>
+  );
 }

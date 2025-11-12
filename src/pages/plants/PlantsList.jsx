@@ -8,6 +8,7 @@ import { plantsApi } from "../../api/plants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { useQueryState } from "../../hooks/useQueryState.js";
+import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 
 const MONTHS = [
   "Янв",
@@ -270,6 +271,7 @@ export default function PlantsList() {
 
   return (
     <PageShell title="Растения" contentClassName="flex flex-col gap-6">
+      <PlantsBreadcrumbs items={[{ label: "Растения" }]} />
       <div className="space-y-6">
         <div className="flex flex-wrap gap-3">
           <div className="flex min-w-[240px] flex-1 items-center rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 shadow-sm transition focus-within:border-blue-400 dark:border-white/10 dark:bg-slate-900/60">

@@ -71,3 +71,38 @@ function createCareApi(resource, label) {
 export const pestsApi = createCareApi("pests", "вредителей");
 export const diseasesApi = createCareApi("diseases", "заболевания");
 export const medicinesApi = createCareApi("medicines", "лекарства");
+
+export const problemsApi = {
+  async list(params = {}) {
+    const res = await apiAuthFetch(`/api/problems${buildQuery(params)}`);
+    return jsonOrThrow(res, "Не удалось загрузить список проблем");
+  },
+};
+
+pestsApi.addMedicines = async function addMedicines(id, ids = []) {
+  const res = await apiAuthFetch(`/api/pests/${id}/medicines`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  return jsonOrThrow(res, "Не удалось привязать лекарства");
+};
+
+pestsApi.removeMedicine = async function removeMedicine(id, medicineId) {
+  const res = await apiAuthFetch(`/api/pests/${id}/medicines/${medicineId}`, { method: "DELETE" });
+  return jsonOrThrow(res, "Не удалось удалить связь");
+};
+
+diseasesApi.addMedicines = async function addMedicines(id, ids = []) {
+  const res = await apiAuthFetch(`/api/diseases/${id}/medicines`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  return jsonOrThrow(res, "Не удалось привязать лекарства");
+};
+
+diseasesApi.removeMedicine = async function removeMedicine(id, medicineId) {
+  const res = await apiAuthFetch(`/api/diseases/${id}/medicines/${medicineId}`, { method: "DELETE" });
+  return jsonOrThrow(res, "Не удалось удалить связь");
+};

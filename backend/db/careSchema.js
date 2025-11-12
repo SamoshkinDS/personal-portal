@@ -99,6 +99,23 @@ export async function ensureCareCatalogSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS pest_medicine (
+      pest_id INT REFERENCES pests(id) ON DELETE CASCADE,
+      medicine_id INT REFERENCES medicines(id) ON DELETE CASCADE,
+      PRIMARY KEY (pest_id, medicine_id)
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS disease_medicine (
+      disease_id INT REFERENCES diseases(id) ON DELETE CASCADE,
+      medicine_id INT REFERENCES medicines(id) ON DELETE CASCADE,
+      PRIMARY KEY (disease_id, medicine_id)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pest_medicine_medicine_id ON pest_medicine(medicine_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_disease_medicine_medicine_id ON disease_medicine(medicine_id);`);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS medicines (
       id SERIAL PRIMARY KEY,
       slug TEXT UNIQUE NOT NULL,

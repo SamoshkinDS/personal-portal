@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { generateHTML } from "@tiptap/html";
 import PageShell from "../../components/PageShell.jsx";
@@ -7,6 +7,8 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { pestsApi } from "../../api/care.js";
 import PestFormModal from "./components/PestFormModal.jsx";
 import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
+import MedicinesSelectModal from "./components/MedicinesSelectModal.jsx";
+import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 
 const EMPTY_DOC = { type: "doc", content: [] };
 
@@ -25,6 +27,9 @@ export default function PestDetail() {
   const [articleOpen, setArticleOpen] = React.useState(false);
   const [articleSaving, setArticleSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [medicineModalOpen, setMedicineModalOpen] = React.useState(false);
+  const [medicinesSaving, setMedicinesSaving] = React.useState(false);
+  const [removingMedicineId, setRemovingMedicineId] = React.useState(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -105,8 +110,46 @@ export default function PestDetail() {
     }
   }, [pest]);
 
+  const existingMedicineIds = React.useMemo(() => new Set((pest?.medicines || []).map((item) => item.id)), [pest]);
+
+  const handleMedicinesAdd = async (ids) => {
+    if (!pest) return;
+    setMedicinesSaving(true);
+    try {
+      const res = await pestsApi.addMedicines(pest.id, ids);
+      setPest((prev) => (prev ? { ...prev, medicines: res.medicines || [] } : prev));
+      toast.success("Привязки сохранены");
+      setMedicineModalOpen(false);
+    } catch (err) {
+      toast.error(err.message || "Не удалось привязать лекарства");
+    } finally {
+      setMedicinesSaving(false);
+    }
+  };
+
+  const handleMedicinesRemove = async (medicineId) => {
+    if (!pest) return;
+    setRemovingMedicineId(medicineId);
+    try {
+      const res = await pestsApi.removeMedicine(pest.id, medicineId);
+      setPest((prev) => (prev ? { ...prev, medicines: res.medicines || [] } : prev));
+      toast.success("Связь удалена");
+    } catch (err) {
+      toast.error(err.message || "Не удалось удалить связь");
+    } finally {
+      setRemovingMedicineId(null);
+    }
+  };
+
   return (
     <PageShell title={pest ? pest.name : "Карточка вредителя"} contentClassName="flex flex-col gap-6">
+      <PlantsBreadcrumbs
+        items={[
+          { label: "Растения", to: "/plants" },
+          { label: "Вредители", to: "/pests" },
+          { label: pest ? pest.name : "Карточка" },
+        ]}
+      />
       {loading ? (
         <div className="h-48 animate-pulse rounded-3xl border border-rose-100 bg-white/80 dark:border-rose-400/20 dark:bg-slate-900/40" />
       ) : error ? (
@@ -205,6 +248,39 @@ export default function PestDetail() {
               )}
             </section>
 
+            <section className="rounded-3xl border border-rose-100 bg-white/90 p-6 shadow-sm dark:border-rose-400/20 dark:bg-slate-900/40">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-rose-500">Лекарства</p>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Рекомендуемые препараты</h2>
+                </div>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setMedicineModalOpen(true)}
+                    className="rounded-2xl border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-400/40 dark:text-emerald-100"
+                  >
+                    Добавить
+                  </button>
+                )}
+              </div>
+              {pest.medicines?.length ? (
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {pest.medicines.map((medicine) => (
+                    <MedicinePill
+                      key={medicine.id}
+                      medicine={medicine}
+                      canManage={canManage}
+                      onRemove={handleMedicinesRemove}
+                      removingId={removingMedicineId}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Связанные лекарства не указаны.</p>
+              )}
+            </section>
+
             <PestFormModal open={formOpen} onClose={() => setFormOpen(false)} initialValue={pest} onSubmit={handleSave} loading={saving} />
             <PlantArticleEditor
               open={articleOpen}
@@ -214,6 +290,13 @@ export default function PestDetail() {
               onSave={handleArticleSave}
               loading={articleSaving}
               modalTitle="Как бороться"
+            />
+            <MedicinesSelectModal
+              open={medicineModalOpen}
+              onClose={() => setMedicineModalOpen(false)}
+              existingIds={existingMedicineIds}
+              onSubmit={handleMedicinesAdd}
+              submitting={medicinesSaving}
             />
           </>
         )
@@ -249,4 +332,27 @@ function dangerLabel(level) {
     default:
       return level;
   }
+}
+
+function MedicinePill({ medicine, canManage, onRemove, removingId }) {
+  return (
+    <div className="relative flex flex-col gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-500/10 dark:text-emerald-100">
+      <Link to={`/medicines/${medicine.slug}`} className="text-base font-semibold text-emerald-700 transition hover:text-emerald-900 dark:text-emerald-100 dark:hover:text-white">
+        {medicine.name}
+      </Link>
+      <span className="inline-flex w-fit rounded-full bg-white/60 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-white/10 dark:text-emerald-100">
+        {medicine.medicine_type || "Тип не указан"}
+      </span>
+      {canManage && (
+        <button
+          type="button"
+          onClick={() => onRemove(medicine.id)}
+          className="absolute right-3 top-3 rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-emerald-600 transition hover:bg-white dark:bg-slate-900/80 dark:text-emerald-200"
+          disabled={removingId === medicine.id}
+        >
+          {removingId === medicine.id ? "…" : "Убрать"}
+        </button>
+      )}
+    </div>
+  );
 }

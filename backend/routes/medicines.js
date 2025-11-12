@@ -51,6 +51,8 @@ function mapMedicineDetailRow(row) {
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    pests: Array.isArray(row.pests) ? row.pests : [],
+    diseases: Array.isArray(row.diseases) ? row.diseases : [],
   };
 }
 
@@ -69,7 +71,41 @@ const medicinesRouter = createCareCatalogRouter({
     m.id, m.slug, m.name, m.description, m.photo_url,
     m.medicine_type, m.form, m.concentration,
     m.expiration_date, m.instruction, m.instruction_text,
-    m.shop_links, m.created_by, m.created_at, m.updated_at
+    m.shop_links, m.created_by, m.created_at, m.updated_at,
+    COALESCE(
+      (
+        SELECT json_agg(
+          json_build_object(
+            'id', p.id,
+            'slug', p.slug,
+            'name', p.name,
+            'danger_level', p.danger_level
+          )
+          ORDER BY LOWER(p.name)
+        )
+        FROM pest_medicine pm
+        JOIN pests p ON p.id = pm.pest_id
+        WHERE pm.medicine_id = m.id
+      ),
+      '[]'::json
+    ) AS pests,
+    COALESCE(
+      (
+        SELECT json_agg(
+          json_build_object(
+            'id', d.id,
+            'slug', d.slug,
+            'name', d.name,
+            'disease_type', d.disease_type
+          )
+          ORDER BY LOWER(d.name)
+        )
+        FROM disease_medicine dm
+        JOIN diseases d ON d.id = dm.disease_id
+        WHERE dm.medicine_id = m.id
+      ),
+      '[]'::json
+    ) AS diseases
   `,
   searchColumns: ["m.name", "m.description", "m.medicine_type", "m.form"],
   buildFilters: buildMedicineFilters,

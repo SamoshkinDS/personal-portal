@@ -8,6 +8,7 @@ import { useQueryState } from "../../hooks/useQueryState.js";
 import { diseasesApi } from "../../api/care.js";
 import CareFiltersModal from "./components/CareFiltersModal.jsx";
 import DiseaseFormModal from "./components/DiseaseFormModal.jsx";
+import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 
 const PAGE_LIMIT = 24;
 const TYPE_OPTIONS = ["Грибковое", "Бактериальное", "Вирусное", "Паразитарное", "Физиологическое"];
@@ -170,6 +171,12 @@ export default function DiseasesList() {
 
   return (
     <PageShell title="Заболевания" contentClassName="flex flex-col gap-6">
+      <PlantsBreadcrumbs
+        items={[
+          { label: "Растения", to: "/plants" },
+          { label: "Заболевания" },
+        ]}
+      />
       <div className="rounded-3xl border border-purple-100 bg-gradient-to-br from-purple-50 to-indigo-50 p-6 shadow-sm dark:border-purple-400/20 dark:from-purple-950/30 dark:to-indigo-950/20">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>

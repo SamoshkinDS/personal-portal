@@ -8,6 +8,7 @@ import { useQueryState } from "../../hooks/useQueryState.js";
 import { medicinesApi } from "../../api/care.js";
 import CareFiltersModal from "./components/CareFiltersModal.jsx";
 import MedicineFormModal from "./components/MedicineFormModal.jsx";
+import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 
 const PAGE_LIMIT = 24;
 const FILTER_SECTIONS = [
@@ -181,6 +182,12 @@ export default function MedicinesList() {
 
   return (
     <PageShell title="Лекарства" contentClassName="flex flex-col gap-6">
+      <PlantsBreadcrumbs
+        items={[
+          { label: "Растения", to: "/plants" },
+          { label: "Лекарства" },
+        ]}
+      />
       <div className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 p-6 shadow-sm dark:border-emerald-400/20 dark:from-emerald-950/30 dark:to-teal-950/20">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>

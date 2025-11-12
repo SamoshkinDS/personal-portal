@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import PageShell from "../../components/PageShell.jsx";
+import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { useQueryState } from "../../hooks/useQueryState.js";
@@ -186,6 +187,12 @@ export default function PestsList() {
 
   return (
     <PageShell title="Вредители" contentClassName="flex flex-col gap-6">
+      <PlantsBreadcrumbs
+        items={[
+          { label: "Растения", to: "/plants" },
+          { label: "Вредители" },
+        ]}
+      />
       <div className="rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50 to-orange-50 p-6 shadow-sm dark:border-rose-400/20 dark:from-rose-950/30 dark:to-orange-950/20">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>

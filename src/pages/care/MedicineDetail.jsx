@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { generateHTML } from "@tiptap/html";
 import PageShell from "../../components/PageShell.jsx";
@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { medicinesApi } from "../../api/care.js";
 import MedicineFormModal from "./components/MedicineFormModal.jsx";
 import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
+import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 
 const EMPTY_DOC = { type: "doc", content: [] };
 
@@ -115,6 +116,13 @@ export default function MedicineDetail() {
 
   return (
     <PageShell title={medicine ? medicine.name : "Карточка лекарства"} contentClassName="flex flex-col gap-6">
+      <PlantsBreadcrumbs
+        items={[
+          { label: "Растения", to: "/plants" },
+          { label: "Лекарства", to: "/medicines" },
+          { label: medicine ? medicine.name : "Карточка" },
+        ]}
+      />
       {loading ? (
         <div className="h-48 animate-pulse rounded-3xl border border-emerald-100 bg-white/80 dark:border-emerald-400/20 dark:bg-slate-900/40" />
       ) : error ? (
@@ -239,6 +247,11 @@ export default function MedicineDetail() {
               </div>
             </section>
 
+            <section className="space-y-6 rounded-3xl border border-emerald-100 bg-white/90 p-6 shadow-sm dark:border-emerald-400/20 dark:bg-slate-900/40">
+              <ProblemList title="Против вредителей" items={medicine.pests} type="pest" />
+              <ProblemList title="Против заболеваний" items={medicine.diseases} type="disease" />
+            </section>
+
             <MedicineFormModal open={formOpen} onClose={() => setFormOpen(false)} initialValue={medicine} onSubmit={handleSave} loading={saving} />
             <PlantArticleEditor
               open={articleOpen}
@@ -270,4 +283,48 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("ru-RU");
+}
+
+function ProblemList({ title, items = [], type }) {
+  const emptyText = type === "pest" ? "Пока нет связей с вредителями." : "Пока нет связей с заболеваниями.";
+  const icon = type === "pest" ? "🐛" : "🧫";
+  return (
+    <div className="space-y-3">
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
+      {items.length ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          {items.map((item) => (
+            <Link
+              key={item.id}
+              to={type === "pest" ? `/pests/${item.slug}` : `/diseases/${item.slug}`}
+              className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 transition hover:border-emerald-200 hover:bg-white hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-100"
+            >
+              <span className="text-2xl">{icon}</span>
+              <div>
+                <p className="font-semibold">{item.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {type === "pest" ? dangerLabel(item.danger_level) : item.disease_type || "Тип не указан"}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-500 dark:text-slate-400">{emptyText}</p>
+      )}
+    </div>
+  );
+}
+
+function dangerLabel(level) {
+  switch (level) {
+    case "high":
+      return "Высокий риск";
+    case "medium":
+      return "Средний риск";
+    case "low":
+      return "Низкий риск";
+    default:
+      return "Опасность не указана";
+  }
 }
