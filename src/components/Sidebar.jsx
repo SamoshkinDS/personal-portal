@@ -370,7 +370,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
           className="inline-flex items-center gap-3"
         >
           <span className="sidebar__link-icon">
-            <img src="/free-icon-humanoid-robot-18220143.png" alt="Logo" className="h-6 w-6 object-contain" />
+            <img src="/favi.png" alt="Logo" className="h-10 w-10 object-contain" />
           </span>
           {!isCollapsed && <span className="text-lg font-semibold tracking-wide">SAMOSHECHKIN</span>}
         </a>

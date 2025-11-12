@@ -21,9 +21,9 @@ export default function Logo({ showName = true, size = "md", className = "" }) {
         className={`${imgSize} shrink-0 rounded-xl ring-1 ring-black/5 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center overflow-hidden`}
       >
         <img
-          src={"/free-icon-humanoid-robot-18220143.png"}
+          src={"/favi.png"}
           alt="Логотип SAMOSHECHKIN"
-          className="h-4/5 w-4/5 object-contain"
+          className="h-10 w-10 object-contain"
           loading="lazy"
           decoding="async"
         />
