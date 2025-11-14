@@ -1,6 +1,6 @@
 // encoding: utf-8
 import React, { useMemo, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -227,12 +227,29 @@ const NAV_GROUPS = [
   { id: "system", title: "Система", items: ["settings", "admin"] },
 ];
 
-function ItemIcon({ children, active }) {
-  return <span className={`sidebar__link-icon ${active ? "is-active" : ""}`}>{children}</span>;
+function ItemIcon({ children, active, onClick, label }) {
+  const className = `sidebar__link-icon ${active ? "is-active" : ""}`;
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={className}
+        aria-label={label || "Открыть"}
+      >
+        {children}
+      </button>
+    );
+  }
+  return <span className={className}>{children}</span>;
 }
 
 export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expanded, setExpanded] = useState({
@@ -299,19 +316,34 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
           ...prev,
           [item.id]: !prev[item.id],
         }));
+      const firstChild = childrenList[0];
+      const handleIconClick = () => {
+        if (!firstChild) return;
+        navigate(firstChild.path);
+        if (mobileOpen) onCloseMobile();
+      };
+      const baseClasses = `group relative flex w-full items-center gap-3 rounded-2xl py-2.5 text-sm font-semibold transition ${isCollapsed ? "justify-center px-2" : "px-4"}`;
+      const activeClasses = isCollapsed
+        ? "text-blue-600 dark:text-white"
+        : "bg-gradient-to-r from-blue-500/15 to-indigo-500/15 text-blue-900 shadow-lg ring-1 ring-blue-500/30 dark:from-blue-500/25 dark:to-indigo-500/25 dark:text-white";
+      const inactiveClasses = isCollapsed
+        ? "text-slate-500 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white"
+        : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-gray-200 dark:hover:bg-white/5 dark:hover:text-white";
       return (
         <div key={item.id} className="space-y-1">
           <button
             type="button"
             onClick={toggle}
-            className={`group relative flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
-              hasActiveChild
-                ? "bg-gradient-to-r from-blue-500/15 to-indigo-500/15 text-blue-900 shadow-lg ring-1 ring-blue-500/30 dark:from-blue-500/25 dark:to-indigo-500/25 dark:text-white"
-                : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-gray-200 dark:hover:bg-white/5 dark:hover:text-white"
-            }`}
+            className={`${baseClasses} ${hasActiveChild ? activeClasses : inactiveClasses}`}
           >
             <span className="flex items-center gap-3">
-              <ItemIcon active={hasActiveChild || active}>{item.icon}</ItemIcon>
+              <ItemIcon
+                active={hasActiveChild || active}
+                onClick={isCollapsed ? handleIconClick : undefined}
+                label={item.label}
+              >
+                {item.icon}
+              </ItemIcon>
               {!isCollapsed && <span>{item.label}</span>}
             </span>
             {!isCollapsed && (
@@ -357,15 +389,20 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
         onClick={() => {
           if (mobileOpen) onCloseMobile();
         }}
-        className={({ isActive }) =>
-          `group relative flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
-            isActive
-              ? "bg-gradient-to-r from-blue-500/15 to-indigo-500/15 text-blue-900 shadow-lg ring-1 ring-blue-500/30 dark:from-blue-500/25 dark:to-indigo-500/25 dark:text-white"
-              : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-gray-200 dark:hover:bg-white/5 dark:hover:text-white"
-          }`
-        }
+        className={({ isActive }) => {
+          const baseClasses = `group relative flex w-full items-center gap-3 rounded-2xl py-2.5 text-sm font-semibold transition ${isCollapsed ? "justify-center px-2" : "px-4"}`;
+          const activeClasses = isCollapsed
+            ? "text-blue-600 dark:text-white"
+            : "bg-gradient-to-r from-blue-500/15 to-indigo-500/15 text-blue-900 shadow-lg ring-1 ring-blue-500/30 dark:from-blue-500/25 dark:to-indigo-500/25 dark:text-white";
+          const inactiveClasses = isCollapsed
+            ? "text-slate-500 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white"
+            : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-gray-200 dark:hover:bg-white/5 dark:hover:text-white";
+          return `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`;
+        }}
       >
-        <ItemIcon active={active}>{item.icon}</ItemIcon>
+        <ItemIcon active={active} label={item.label}>
+          {item.icon}
+        </ItemIcon>
         {!isCollapsed && (
           <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -6 }} transition={{ duration: 0.15 }}>
             {item.label}
@@ -448,10 +485,10 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
 
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div key="mobile-drawer" className="fixed inset-0 z-40 sm:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onCloseMobile}>
+          <motion.div key="mobile-drawer" className="fixed inset-0 z-[60] sm:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onCloseMobile}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
             <motion.aside
-              className="absolute left-0 top-0 h-full w-72 bg-white text-gray-900 shadow-2xl ring-1 ring-black/5 dark:bg-slate-950 dark:text-gray-100"
+              className="absolute left-0 top-0 flex h-full w-72 flex-col bg-white text-gray-900 shadow-2xl ring-1 ring-black/5 dark:bg-slate-950 dark:text-gray-100"
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}
@@ -469,7 +506,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
                   ×
                 </button>
               </div>
-              <nav className="max-h-[calc(100%-120px)] overflow-y-auto px-3 py-4">
+              <nav className="flex-1 overflow-y-auto px-3 py-4">
                 <div className="flex flex-col gap-6">
                   {groupedNav.map((group) => {
                     const visibleItems = group.items.map(renderLink).filter(Boolean);
