@@ -152,11 +152,11 @@ function Home() {
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <motion.div
           layout
-          className="relative overflow-hidden rounded-3xl border border-slate-200/60 bg-gradient-to-br from-white via-white to-slate-50 p-8 shadow-sm transition-colors duration-500 dark:border-slate-700/50 dark:from-slate-900 dark:via-slate-900/70 dark:to-slate-900"
+          className="relative overflow-hidden rounded-3xl border border-slate-200/60 bg-gradient-to-br from-white via-white to-slate-50 p-6 shadow-sm transition-colors duration-500 dark:border-slate-700/50 dark:from-slate-900 dark:via-slate-900/70 dark:to-slate-900 sm:p-8"
         >
           <span className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl dark:bg-sky-400/10" />
           <span className="pointer-events-none absolute -bottom-24 -left-8 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl dark:bg-blue-400/10" />
-          <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
             <div className="max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">
                 Привет, {user?.username || "коллега"} 👋
@@ -275,4 +275,3 @@ function Home() {
 }
 
 export default Home;
-

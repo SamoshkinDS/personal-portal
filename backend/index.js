@@ -514,7 +514,31 @@ app.get("/api/system-stats", (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`рџљЂ Server started on http://localhost:${PORT}`);
-});
+// Start server with graceful fallback if port is not available
+const HOST = "127.0.0.1";
+
+function startServer(port) {
+  const server = app.listen(port, HOST, () => {
+    const actual = server.address();
+    console.log(`🚀 Server started on http://${HOST}:${actual.port}`);
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EACCES" || err.code === "EADDRINUSE") {
+      console.error(`Port ${port} is not available (${err.code}). Trying random free port...`);
+      const fallback = app.listen(0, HOST, () => {
+        const addr = fallback.address();
+        console.log(`🚀 Server started on http://${HOST}:${addr.port} (fallback)`);
+      });
+      fallback.on("error", (fallbackErr) => {
+        console.error("Failed to bind fallback port", fallbackErr);
+        process.exit(1);
+      });
+    } else {
+      console.error("Failed to start server", err);
+      process.exit(1);
+    }
+  });
+}
+
+startServer(PORT);

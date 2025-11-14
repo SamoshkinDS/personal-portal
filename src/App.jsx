@@ -75,7 +75,7 @@ function AppRoutes() {
     registerPush();
   }, []);
 
-  // Глобальный переключатель для PageShell/Header
+  // Глобальный переключатель для PageShell/MainHeader
   React.useEffect(() => {
     window.__toggleSidebar = () => setMobileOpen((v) => !v);
     return () => {
@@ -87,32 +87,6 @@ function AppRoutes() {
   React.useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
-
-  // Свайпы: открыть от левого края вправо, закрыть — влево
-  const touchRef = React.useRef({ startX: 0, startY: 0, tracking: false });
-  const onTouchStart = (e) => {
-    const t = e.touches?.[0];
-    if (!t) return;
-    touchRef.current = { startX: t.clientX, startY: t.clientY, tracking: true };
-  };
-  const onTouchMove = (e) => {
-    const t = e.touches?.[0];
-    if (!t || !touchRef.current.tracking) return;
-    const dx = t.clientX - touchRef.current.startX;
-    const dy = t.clientY - touchRef.current.startY;
-    if (Math.abs(dy) > Math.abs(dx)) return; // вертикаль — игнор
-    if (!mobileOpen && touchRef.current.startX < 24 && dx > 60) {
-      setMobileOpen(true);
-      touchRef.current.tracking = false;
-    }
-    if (mobileOpen && dx < -60) {
-      setMobileOpen(false);
-      touchRef.current.tracking = false;
-    }
-  };
-  const onTouchEnd = () => {
-    touchRef.current.tracking = false;
-  };
 
   return (
     <AnimatePresence mode="wait">
@@ -147,22 +121,7 @@ function AppRoutes() {
       ) : (
         <div className="app-layout flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 text-gray-900 transition-colors duration-500 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 dark:text-gray-100">
           <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
-          {/* Зона захвата свайпа от левого края для iOS PWA и мобильных браузеров */}
-          {!mobileOpen && (
-            <div
-              className="fixed inset-y-0 left-0 z-20 w-6 sm:hidden"
-              onTouchStart={onTouchStart}
-              onTouchMove={onTouchMove}
-              onTouchEnd={onTouchEnd}
-              aria-hidden="true"
-            />
-          )}
-          <div
-            className="app-layout__content flex min-w-0 flex-1 flex-col transition-colors duration-500"
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-          >
+          <div className="app-layout__content flex min-w-0 flex-1 flex-col transition-colors duration-500">
             <Routes location={location} key={location.pathname}>
               {(() => {
                 const role = user?.role || "NON_ADMIN";

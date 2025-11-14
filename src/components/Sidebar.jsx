@@ -215,17 +215,25 @@ const NAV = [
   },
 ];
 
+const NAV_MAP = NAV.reduce((acc, item) => {
+  acc[item.id] = item;
+  return acc;
+}, {});
+
+const NAV_GROUPS = [
+  { id: "overview", title: "Рабочая зона", items: ["home", "analytics", "ai", "docs", "posts"] },
+  { id: "operations", title: "Инфраструктура", items: ["plants", "vpn"] },
+  { id: "finance", title: "Финансы", items: ["accounting"] },
+  { id: "system", title: "Система", items: ["settings", "admin"] },
+];
+
 function ItemIcon({ children, active }) {
-  return (
-    <span className={`sidebar__link-icon ${active ? "ring-2 ring-blue-400/40 bg-blue-50 text-blue-700 dark:bg-white/10 dark:ring-white/20 dark:text-blue-200" : ""}`}>
-      {children}
-    </span>
-  );
+  return <span className={`sidebar__link-icon ${active ? "is-active" : ""}`}>{children}</span>;
 }
 
 export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }) {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expanded, setExpanded] = useState({
     ai: location.pathname.startsWith("/ai"),
@@ -239,30 +247,45 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
       location.pathname.startsWith("/medicines") ||
       location.pathname.startsWith("/problems"),
   });
+  const groupedNav = useMemo(
+    () =>
+      NAV_GROUPS.map((group) => ({
+        ...group,
+        items: group.items.map((id) => NAV_MAP[id]).filter(Boolean),
+      })),
+    [],
+  );
 
   const role = user?.role || "NON_ADMIN";
   const perms = useMemo(() => new Set(user?.permissions || []), [user]);
   const hasPerm = (perm) => role === "ALL" || perms.has(perm) || perms.has("admin_access");
+  const allowAdmin = hasPerm("admin_access");
+  const allowAnalytics = hasPerm("view_analytics");
+  const allowAI = hasPerm("view_ai");
+  const allowVPN = hasPerm("view_vpn") || user?.vpnCanCreate;
+  const allowAccountingView = hasPerm("accounting:view");
+  const allowAccountingEdit = hasPerm("accounting:edit");
+  const allowAccountingAdmin = hasPerm("accounting:admin");
 
-  const filteredNav = useMemo(() => {
-    return NAV.filter((item) => {
-      if (item.id === "admin") return hasPerm("admin_access");
-      if (item.id === "analytics") return hasPerm("view_analytics");
-      if (item.id === "ai") return hasPerm("view_ai");
-      if (item.id === "vpn") return hasPerm("view_vpn") || user?.vpnCanCreate;
-      return true;
-    });
-  }, [role, user?.vpnCanCreate, perms]);
+  const handleLogout = () => {
+    logout();
+    if (mobileOpen) onCloseMobile();
+  };
 
   const renderLink = (item) => {
+    if (!item) return null;
     const active = item.path ? location.pathname.startsWith(item.path) : false;
+    if (item.id === "admin" && !allowAdmin) return null;
+    if (item.id === "analytics" && !allowAnalytics) return null;
+    if (item.id === "ai" && !allowAI) return null;
+    if (item.id === "vpn" && !allowVPN) return null;
     if (item.children) {
       let childrenList = item.children;
       if (item.id === "accounting") {
         childrenList = item.children.filter((child) => {
-          if (child.id === "accounting-dashboard") return hasPerm("accounting:view");
-          if (child.id === "accounting-settings") return hasPerm("accounting:admin");
-          return hasPerm("accounting:edit");
+          if (child.id === "accounting-dashboard") return allowAccountingView || allowAccountingEdit || allowAccountingAdmin;
+          if (child.id === "accounting-settings") return allowAccountingAdmin;
+          return allowAccountingEdit || allowAccountingAdmin;
         });
         if (childrenList.length === 0) return null;
       } else {
@@ -281,14 +304,14 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
           <button
             type="button"
             onClick={toggle}
-            className={`group relative flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-2 text-sm font-medium transition ${
+            className={`group relative flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
               hasActiveChild
-                ? "bg-gradient-to-r from-blue-500/15 to-indigo-600/15 text-slate-900 ring-1 ring-blue-500/20 dark:from-indigo-500/20 dark:to-blue-600/20 dark:text-white dark:ring-white/10"
-                : "text-slate-700 hover:bg-black/5 hover:text-slate-900 dark:text-gray-200 dark:hover:bg-white/10 dark:hover:text-white"
+                ? "bg-gradient-to-r from-blue-500/15 to-indigo-500/15 text-blue-900 shadow-lg ring-1 ring-blue-500/30 dark:from-blue-500/25 dark:to-indigo-500/25 dark:text-white"
+                : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-gray-200 dark:hover:bg-white/5 dark:hover:text-white"
             }`}
           >
             <span className="flex items-center gap-3">
-              <ItemIcon active={hasActiveChild && isCollapsed}>{item.icon}</ItemIcon>
+              <ItemIcon active={hasActiveChild || active}>{item.icon}</ItemIcon>
               {!isCollapsed && <span>{item.label}</span>}
             </span>
             {!isCollapsed && (
@@ -310,10 +333,10 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
                       if (mobileOpen) onCloseMobile();
                     }}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-2xl px-3 py-2 text-xs transition ${
+                      `flex items-center gap-3 rounded-2xl px-3 py-2 text-xs font-medium transition ${
                         isActive
-                          ? "bg-blue-50 text-blue-700 ring-1 ring-blue-500/20 dark:bg-white/10 dark:text-blue-200"
-                          : "text-slate-600 hover:bg-black/5 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+                          ? "bg-blue-100/80 text-blue-700 ring-1 ring-blue-500/30 dark:bg-blue-500/20 dark:text-white"
+                          : "text-slate-500 hover:bg-white/60 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
                       }`
                     }
                   >
@@ -335,14 +358,14 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
           if (mobileOpen) onCloseMobile();
         }}
         className={({ isActive }) =>
-          `group relative flex items-center gap-3 rounded-2xl px-4 py-2 text-sm font-medium transition ${
+          `group relative flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
             isActive
-              ? "bg-gradient-to-r from-blue-500/15 to-indigo-600/15 text-slate-900 ring-1 ring-blue-500/20 dark:from-indigo-500/20 dark:to-blue-600/20 dark:text-white dark:ring-white/10"
-              : "text-slate-700 hover:bg-black/5 hover:text-slate-900 dark:text-gray-200 dark:hover:bg-white/10 dark:hover:text-white"
+              ? "bg-gradient-to-r from-blue-500/15 to-indigo-500/15 text-blue-900 shadow-lg ring-1 ring-blue-500/30 dark:from-blue-500/25 dark:to-indigo-500/25 dark:text-white"
+              : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-gray-200 dark:hover:bg-white/5 dark:hover:text-white"
           }`
         }
       >
-        <ItemIcon active={active && isCollapsed}>{item.icon}</ItemIcon>
+        <ItemIcon active={active}>{item.icon}</ItemIcon>
         {!isCollapsed && (
           <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -6 }} transition={{ duration: 0.15 }}>
             {item.label}
@@ -387,9 +410,27 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
       >
         {brand}
         <nav className="flex-1 overflow-y-auto px-3 py-6" style={{ scrollbarGutter: "stable" }}>
-          <div className="flex flex-col gap-1">{filteredNav.map(renderLink)}</div>
+          <div className="flex flex-col gap-6">
+            {groupedNav.map((group) => {
+              const visibleItems = group.items.map(renderLink).filter(Boolean);
+              if (visibleItems.length === 0) return null;
+              return (
+                <div key={group.id} className="space-y-2">
+                  <p className="px-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400/80 dark:text-slate-500">{group.title}</p>
+                  <div className="flex flex-col gap-1">{visibleItems}</div>
+                </div>
+              );
+            })}
+          </div>
         </nav>
         <div className="sticky bottom-0 border-t border-white/10 px-3 py-3">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-500/20 dark:bg-red-500/10 dark:text-red-200"
+          >
+            <span>Выйти</span>
+          </button>
           <button
             type="button"
             onClick={() => setIsCollapsed((v) => !v)}
@@ -428,9 +469,31 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
                   ×
                 </button>
               </div>
-              <nav className="max-h-[calc(100%-56px)] overflow-y-auto px-3 py-4">
-                <div className="flex flex-col gap-1">{filteredNav.map(renderLink)}</div>
+              <nav className="max-h-[calc(100%-120px)] overflow-y-auto px-3 py-4">
+                <div className="flex flex-col gap-6">
+                  {groupedNav.map((group) => {
+                    const visibleItems = group.items.map(renderLink).filter(Boolean);
+                    if (visibleItems.length === 0) return null;
+                    return (
+                      <div key={group.id} className="space-y-2">
+                        <p className="px-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400/80 dark:text-slate-500">
+                          {group.title}
+                        </p>
+                        <div className="flex flex-col gap-1">{visibleItems}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </nav>
+              <div className="border-t border-black/10 px-4 py-4 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center justify-center rounded-2xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-500/20 dark:bg-red-500/10 dark:text-red-200"
+                >
+                  Выйти
+                </button>
+              </div>
             </motion.aside>
           </motion.div>
         )}
