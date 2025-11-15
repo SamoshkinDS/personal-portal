@@ -414,7 +414,7 @@ function SortSwitch({ active, onChange }) {
 function PlantGrid({ items, loading, loadingMore, total, hasActiveFilters, canManage }) {
   if (loading && items.length === 0) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, idx) => (
           <SkeletonCard key={idx} />
         ))}
@@ -445,7 +445,7 @@ function PlantGrid({ items, loading, loadingMore, total, hasActiveFilters, canMa
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
         <AnimatePresence>
           {items.map((plant) => (
             <motion.div
@@ -462,7 +462,7 @@ function PlantGrid({ items, loading, loadingMore, total, hasActiveFilters, canMa
         </AnimatePresence>
       </div>
       {loading && items.length > 0 && (
-        <div className="mt-4 grid gap-4 opacity-60 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-4 opacity-60 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: Math.min(4, items.length) }).map((_, idx) => (
             <SkeletonCard key={`loading-${idx}`} />
           ))}

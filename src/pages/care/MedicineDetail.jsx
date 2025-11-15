@@ -8,6 +8,7 @@ import { medicinesApi } from "../../api/care.js";
 import MedicineFormModal from "./components/MedicineFormModal.jsx";
 import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
 import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
+import CareCoverCard from "./components/CareCoverCard.jsx";
 
 const EMPTY_DOC = { type: "doc", content: [] };
 
@@ -26,6 +27,7 @@ export default function MedicineDetail() {
   const [articleOpen, setArticleOpen] = React.useState(false);
   const [articleSaving, setArticleSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [photoUploading, setPhotoUploading] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -97,6 +99,21 @@ export default function MedicineDetail() {
     }
   };
 
+
+  const handlePhotoUpload = async (file) => {
+    if (!medicine || !file) return;
+    setPhotoUploading(true);
+    try {
+      const res = await medicinesApi.uploadPhoto(medicine.id, file);
+      setMedicine(res.item);
+      toast.success('???? ?????????');
+    } catch (err) {
+      toast.error(err.message || '?? ??????? ???????? ????');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const articleHtml = React.useMemo(() => {
     if (!medicine?.instruction) return "";
     try {
@@ -133,13 +150,15 @@ export default function MedicineDetail() {
         medicine && (
           <>
             <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
-              <div className="overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-sm dark:border-emerald-400/20 dark:from-emerald-900/40 dark:to-teal-900/20">
-                {medicine.photo_url ? (
-                  <img src={medicine.photo_url} alt={medicine.name} className="h-full w-full object-cover" loading="lazy" />
-                ) : (
-                  <div className="flex h-72 items-center justify-center text-6xl">💊</div>
-                )}
-              </div>
+              <CareCoverCard
+                photoUrl={medicine.photo_url}
+                name={medicine.name}
+                placeholder="??"
+                canManage={canManage}
+                uploading={photoUploading}
+                onUpload={handlePhotoUpload}
+                className="border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 dark:border-emerald-400/20 dark:from-emerald-900/30 dark:to-teal-900/30"
+              />
               <div className="space-y-6">
                 <div className="flex flex-wrap gap-3">
                   {medicine.medicine_type && (

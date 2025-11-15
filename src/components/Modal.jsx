@@ -4,11 +4,25 @@ import { createPortal } from "react-dom";
 
 export default function Modal({ open, onClose, title, children, maxWidth = "max-w-2xl" }) {
   const [mounted, setMounted] = React.useState(false);
+  const [shouldRender, setShouldRender] = React.useState(open);
 
   React.useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  React.useEffect(() => {
+    // Keep the modal in the DOM just long enough for exit animations without leaving focusable nodes hidden
+    let timeout;
+    if (open) {
+      setShouldRender(true);
+    } else if (shouldRender) {
+      timeout = setTimeout(() => setShouldRender(false), 300);
+    }
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [open, shouldRender]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -19,12 +33,11 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
     };
   }, [open]);
 
-  if (!mounted) return null;
+  if (!mounted || !shouldRender) return null;
 
   return createPortal(
     <div
       className={`fixed inset-0 z-40 ${open ? "pointer-events-auto" : "pointer-events-none"}`}
-      aria-hidden={!open}
     >
       <div
         className={`absolute inset-0 bg-slate-900/50 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"}`}
@@ -59,4 +72,3 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
     document.body
   );
 }
-

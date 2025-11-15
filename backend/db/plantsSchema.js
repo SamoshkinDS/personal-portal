@@ -188,13 +188,32 @@ export async function ensurePlantsSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS plants_history (
       id SERIAL PRIMARY KEY,
-      plant_id INT REFERENCES plants(id),
+      plant_id INT REFERENCES plants(id) ON DELETE CASCADE,
       user_id INT,
       field TEXT,
       old_value TEXT,
       new_value TEXT,
       changed_at TIMESTAMPTZ DEFAULT now()
     );
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'plants_history_plant_id_fkey'
+          AND table_name = 'plants_history'
+      ) THEN
+        ALTER TABLE plants_history
+        DROP CONSTRAINT plants_history_plant_id_fkey;
+      END IF;
+    END$$;
+  `);
+  await pool.query(`
+    ALTER TABLE plants_history
+    ADD CONSTRAINT plants_history_plant_id_fkey
+    FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE CASCADE;
   `);
 
   await pool.query(`

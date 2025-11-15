@@ -4,7 +4,6 @@ import toast from "react-hot-toast";
 import { generateHTML } from "@tiptap/html";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import PageShell from "../../components/PageShell.jsx";
 import Modal from "../../components/Modal.jsx";
 import { plantsApi } from "../../api/plants.js";
@@ -266,13 +265,23 @@ export default function PlantDetail() {
         plant && (
           <>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
-              <ImageBlock
-                plant={plant}
-                onUploadMain={handleMainUpload}
-                uploading={uploadingMain}
-                canManage={canManage}
-                cacheBuster={imageVersion}
-              />
+              <div className="space-y-6">
+                <ImageBlock
+                  plant={plant}
+                  onUploadMain={handleMainUpload}
+                  uploading={uploadingMain}
+                  canManage={canManage}
+                  cacheBuster={imageVersion}
+                />
+                <GallerySection
+                  images={gallery}
+                  onUpload={handleGalleryUpload}
+                  onDelete={handleGalleryDelete}
+                  onReorder={handleGalleryReorder}
+                  uploading={uploadingGallery}
+                  canManage={canManage}
+                />
+              </div>
               <PassportBlock
                 plant={plant}
                 canManage={canManage}
@@ -284,15 +293,6 @@ export default function PlantDetail() {
             </div>
 
             <TagsBlock tags={plant.tags || []} />
-
-            <GallerySection
-              images={gallery}
-              onUpload={handleGalleryUpload}
-              onDelete={handleGalleryDelete}
-              onReorder={handleGalleryReorder}
-              uploading={uploadingGallery}
-              canManage={canManage}
-            />
 
             <ArticleSection
               html={articleHtml}
@@ -467,7 +467,6 @@ function PassportBlock({ plant, canManage, onEdit, onClone, onDeleteRequest, nei
       </div>
       {neighbors.length > 0 && <IdealNeighborsBadge neighbors={neighbors} />}
       <ToxicityTable plant={plant} />
-      <CareChart plant={plant} />
       {plant.description && (
         <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-200">
           {plant.description}
@@ -540,45 +539,6 @@ function IdealNeighborsBadge({ neighbors }) {
     <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 text-sm text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-100">
       <p className="font-semibold">Совместимо с:</p>
       <p>{preview.map((item) => item.common_name).join(", ")}</p>
-    </div>
-  );
-}
-
-function CareChart({ plant }) {
-  const data = React.useMemo(() => buildCareChartData(plant), [plant]);
-  if (!data.length) return null;
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-800/40">
-      <p className="mb-2 text-sm font-semibold text-slate-600 dark:text-slate-200">Диаграмма ухода</p>
-      <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={data}>
-          <defs>
-            <linearGradient id="wateringGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="bloomGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#f97316" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 12 }} />
-          <YAxis hide domain={[0, 5]} />
-          <RechartsTooltip
-            contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-            formatter={(value, name) =>
-              [
-                value,
-                name === "watering" ? "Полив" : name === "bloom" ? "Цветение" : "Подкормка",
-              ]
-            }
-          />
-          <Area type="monotone" dataKey="watering" stroke="#3b82f6" fillOpacity={1} fill="url(#wateringGradient)" />
-          <Area type="monotone" dataKey="bloom" stroke="#f97316" fillOpacity={1} fill="url(#bloomGradient)" />
-          <Area type="monotone" dataKey="feeding" stroke="#14b8a6" fillOpacity={0.2} />
-        </AreaChart>
-      </ResponsiveContainer>
     </div>
   );
 }
@@ -659,6 +619,7 @@ function GallerySection({ images, onUpload, onDelete, onReorder, uploading, canM
   const inputRef = React.useRef(null);
   const [localImages, setLocalImages] = React.useState(images);
   const [draggingId, setDraggingId] = React.useState(null);
+  const [previewIndex, setPreviewIndex] = React.useState(null);
 
   React.useEffect(() => {
     setLocalImages(images);
@@ -672,15 +633,52 @@ function GallerySection({ images, onUpload, onDelete, onReorder, uploading, canM
     onReorder?.(next.map((img) => img.id));
   };
 
+  const openPreviewById = (imageId) => {
+    const index = localImages.findIndex((img) => img.id === imageId);
+    if (index >= 0) setPreviewIndex(index);
+  };
+
+  const closePreview = () => setPreviewIndex(null);
+  const showPrev = () => {
+    if (!localImages.length) return;
+    setPreviewIndex((prev) => (prev === null ? 0 : (prev - 1 + localImages.length) % localImages.length));
+  };
+  const showNext = () => {
+    if (!localImages.length) return;
+    setPreviewIndex((prev) => (prev === null ? 0 : (prev + 1) % localImages.length));
+  };
+
+  const visibleImages = localImages.slice(0, 8);
+  const hiddenCount = Math.max(0, localImages.length - visibleImages.length);
+  const previewImage = previewIndex === null ? null : localImages[previewIndex];
+
+  React.useEffect(() => {
+    if (previewIndex === null) return () => {};
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePreview();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        showPrev();
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        showNext();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewIndex, localImages.length]);
+
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 rounded-3xl border border-slate-100 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/60">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Галерея</h3>
+        <h3 className="text-base font-semibold text-slate-800 dark:text-white">Галерея</h3>
         {canManage && (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-blue-200 hover:text-blue-600 dark:border-white/10 dark:text-slate-200"
+            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-blue-200 hover:text-blue-600 dark:border-white/10 dark:text-slate-200"
           >
             {uploading ? "Загрузка..." : "Добавить"}
           </button>
@@ -699,49 +697,100 @@ function GallerySection({ images, onUpload, onDelete, onReorder, uploading, canM
         />
       </div>
       {localImages.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500 dark:border-white/20 dark:text-slate-400">
-          Пока нет дополнительных фото.
+        <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500 dark:border-white/20 dark:text-slate-400">
+          Галерея пока пуста.
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {localImages.map((image) => (
-            <div
-              key={image.id}
-              draggable={canManage}
-              onDragStart={() => setDraggingId(image.id)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(image.id);
-              }}
-              onDragEnd={() => setDraggingId(null)}
-              className={`group relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 transition dark:border-white/10 dark:bg-slate-800/40 ${
-                draggingId === image.id ? "ring-2 ring-blue-400" : ""
-              }`}
-            >
-              <img src={image.preview_url || image.image_url} alt="Фото растения" className="h-48 w-full object-cover" loading="lazy" />
-              {canManage && (
-                <>
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+          {visibleImages.map((image, idx) => {
+            const showHiddenBadge = hiddenCount > 0 && idx === visibleImages.length - 1;
+            return (
+              <div
+                key={image.id}
+                draggable={canManage}
+                onDragStart={() => setDraggingId(image.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDrop(image.id);
+                }}
+                onDragEnd={() => setDraggingId(null)}
+                className={`relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 text-left transition dark:border-white/10 dark:bg-slate-800/40 ${draggingId === image.id ? "ring-2 ring-blue-400" : ""}`}
+              >
+                <button type="button" className="block w-full" onClick={() => openPreviewById(image.id)}>
+                  <img
+                    src={image.preview_url || image.image_url}
+                    alt="Фото растения"
+                    className="h-20 w-full object-cover sm:h-24"
+                    loading="lazy"
+                  />
+                  {showHiddenBadge && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-slate-900/70 text-sm font-semibold text-white">
+                      +{hiddenCount}
+                    </span>
+                  )}
+                </button>
+                {canManage && (
                   <button
                     type="button"
-                    onClick={() => onDelete(image.id)}
-                    className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-rose-600 shadow hover:bg-white"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(image.id);
+                    }}
+                    className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600 shadow hover:bg-white"
                   >
                     Удалить
                   </button>
-                  <span className="absolute left-3 top-3 rounded-full bg-slate-900/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                    ⇅
-                  </span>
-                </>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm" onClick={closePreview}>
+          <div className="flex items-center justify-between px-6 py-4 text-white">
+            <span className="text-sm font-semibold">
+              {previewIndex + 1} / {localImages.length}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                closePreview();
+              }}
+              className="rounded-full bg-white/20 px-3 py-1 text-sm text-white transition hover:bg-white/40"
+            >
+              Закрыть
+            </button>
+          </div>
+          <div className="relative flex flex-1 items-center justify-center px-4" onClick={(e) => e.stopPropagation()}>
+            {localImages.length > 1 && (
+              <button
+                type="button"
+                onClick={showPrev}
+                className="absolute left-6 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-3 text-white transition hover:bg-white/40"
+              >
+                ‹
+              </button>
+            )}
+            <img src={previewImage.image_url} alt="Фото растения" className="max-h-[80vh] max-w-full rounded-2xl object-contain shadow-2xl" />
+            {localImages.length > 1 && (
+              <button
+                type="button"
+                onClick={showNext}
+                className="absolute right-6 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-3 text-white transition hover:bg-white/40"
+              >
+                ›
+              </button>
+            )}
+          </div>
         </div>
       )}
     </section>
   );
 }
-
 function reorderImages(list, sourceId, targetId) {
   const next = [...list];
   const from = next.findIndex((item) => item.id === sourceId);
@@ -1151,27 +1200,4 @@ function buildCareBadges(plant) {
   return badges;
 }
 
-function buildCareChartData(plant) {
-  if (!plant?.watering?.name && !plant?.blooming_month) return [];
-  const wateringScore = scoreFromDescriptor(plant.watering?.name);
-  const feedingBase = Math.max(1, wateringScore - 1);
-  return MONTHS.map((label, index) => {
-    const month = index + 1;
-    const bloom = plant.blooming_month === month ? 5 : 0;
-    return {
-      month: label.slice(0, 3),
-      watering: wateringScore,
-      feeding: bloom ? 4 : feedingBase,
-      bloom,
-    };
-  });
-}
 
-function scoreFromDescriptor(text) {
-  if (!text) return 2;
-  const value = text.toLowerCase();
-  if (value.includes("част")) return 4;
-  if (value.includes("умер")) return 3;
-  if (value.includes("редк")) return 1;
-  return 2;
-}

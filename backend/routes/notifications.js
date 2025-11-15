@@ -4,6 +4,15 @@ import { pool } from "../db/connect.js";
 
 const router = express.Router();
 
+// Public endpoint so the client can always fetch the configured VAPID key
+router.get("/public-key", (req, res) => {
+  const publicKey = (process.env.WEB_PUSH_PUBLIC_KEY || "").trim();
+  if (!publicKey) {
+    return res.status(404).json({ message: "Push notifications are not configured" });
+  }
+  return res.json({ publicKey });
+});
+
 router.use(authRequired);
 
 // Get notifications. For now, proxy admin logs as notifications.
@@ -50,4 +59,3 @@ router.post("/subscribe", async (req, res) => {
 });
 
 export default router;
-

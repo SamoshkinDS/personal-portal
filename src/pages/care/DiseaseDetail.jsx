@@ -9,6 +9,7 @@ import DiseaseFormModal from "./components/DiseaseFormModal.jsx";
 import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
 import MedicinesSelectModal from "./components/MedicinesSelectModal.jsx";
 import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
+import CareCoverCard from "./components/CareCoverCard.jsx";
 
 const EMPTY_DOC = { type: "doc", content: [] };
 
@@ -27,6 +28,7 @@ export default function DiseaseDetail() {
   const [articleOpen, setArticleOpen] = React.useState(false);
   const [articleSaving, setArticleSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [photoUploading, setPhotoUploading] = React.useState(false);
   const [medicineModalOpen, setMedicineModalOpen] = React.useState(false);
   const [medicinesSaving, setMedicinesSaving] = React.useState(false);
   const [removingMedicineId, setRemovingMedicineId] = React.useState(null);
@@ -101,6 +103,21 @@ export default function DiseaseDetail() {
     }
   };
 
+
+  const handlePhotoUpload = async (file) => {
+    if (!disease || !file) return;
+    setPhotoUploading(true);
+    try {
+      const res = await diseasesApi.uploadPhoto(disease.id, file);
+      setDisease(res.item);
+      toast.success('???? ?????????');
+    } catch (err) {
+      toast.error(err.message || '?? ??????? ???????? ????');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const articleHtml = React.useMemo(() => {
     if (!disease?.treatment_text) return "";
     try {
@@ -160,13 +177,15 @@ export default function DiseaseDetail() {
         disease && (
           <>
             <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
-              <div className="overflow-hidden rounded-3xl border border-purple-100 bg-gradient-to-br from-purple-50 to-indigo-50 shadow-sm dark:border-purple-400/20 dark:from-purple-900/40 dark:to-indigo-900/20">
-                {disease.photo_url ? (
-                  <img src={disease.photo_url} alt={disease.name} className="h-full w-full object-cover" loading="lazy" />
-                ) : (
-                  <div className="flex h-72 items-center justify-center text-6xl">🦠</div>
-                )}
-              </div>
+              <CareCoverCard
+                photoUrl={disease.photo_url}
+                name={disease.name}
+                placeholder="??"
+                canManage={canManage}
+                uploading={photoUploading}
+                onUpload={handlePhotoUpload}
+                className="border-purple-100 bg-gradient-to-br from-purple-50 to-indigo-50 dark:border-purple-400/30 dark:from-purple-900/30 dark:to-indigo-900/40"
+              />
               <div className="space-y-6">
                 <div className="flex flex-wrap gap-3">
                   {disease.disease_type && (

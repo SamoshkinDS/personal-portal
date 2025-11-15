@@ -12,6 +12,7 @@ export async function ensureCareCatalogSchema() {
       name TEXT NOT NULL,
       description TEXT,
       photo_url TEXT,
+      photo_key TEXT,
       danger_level TEXT,
       symptoms TEXT,
       active_period TEXT,
@@ -25,7 +26,8 @@ export async function ensureCareCatalogSchema() {
   await pool.query(`
     ALTER TABLE pests
       ADD COLUMN IF NOT EXISTS fight_text JSONB DEFAULT ${EMPTY_RICH_DOC},
-      ADD COLUMN IF NOT EXISTS fight_text_plain TEXT DEFAULT '';
+      ADD COLUMN IF NOT EXISTS fight_text_plain TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS photo_key TEXT;
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pest_symptom_images (
@@ -58,6 +60,7 @@ export async function ensureCareCatalogSchema() {
       name TEXT NOT NULL,
       description TEXT,
       photo_url TEXT,
+      photo_key TEXT,
       reason TEXT,
       disease_type TEXT,
       symptoms TEXT,
@@ -72,7 +75,8 @@ export async function ensureCareCatalogSchema() {
   await pool.query(`
     ALTER TABLE diseases
       ADD COLUMN IF NOT EXISTS treatment_text JSONB DEFAULT ${EMPTY_RICH_DOC},
-      ADD COLUMN IF NOT EXISTS treatment_text_plain TEXT DEFAULT '';
+      ADD COLUMN IF NOT EXISTS treatment_text_plain TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS photo_key TEXT;
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS disease_symptom_images (
@@ -122,6 +126,7 @@ export async function ensureCareCatalogSchema() {
       name TEXT NOT NULL,
       description TEXT,
       photo_url TEXT,
+      photo_key TEXT,
       medicine_type TEXT,
       form TEXT,
       concentration TEXT,
@@ -138,7 +143,8 @@ export async function ensureCareCatalogSchema() {
     ALTER TABLE medicines
       ADD COLUMN IF NOT EXISTS instruction JSONB DEFAULT ${EMPTY_RICH_DOC},
       ADD COLUMN IF NOT EXISTS instruction_text TEXT DEFAULT '',
-      ADD COLUMN IF NOT EXISTS shop_links TEXT DEFAULT '';
+      ADD COLUMN IF NOT EXISTS shop_links TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS photo_key TEXT;
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS medicines_history (

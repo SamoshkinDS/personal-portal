@@ -84,24 +84,38 @@ const NAV = [
       </svg>
     ),
     children: [
-      { id: "plants-list", path: "/plants", label: "Список растений" },
-          {
-            id: "plants-problems",
-            path: "/problems",
-            label: "Проблемы и решения",
-            icon: (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 21v-4" />
-                <path d="M8 21v-2" />
-                <path d="M12 21v-6" />
-                <path d="M16 21v-4" />
-                <path d="M20 21V8" />
-                <path d="M22 7 12 3 2 7" />
-                <path d="M18 17h4" />
-                <path d="M2 21h20" />
-              </svg>
-            ),
-          },
+      {
+        id: "plants-list",
+        path: "/plants",
+        label: "Каталог растений",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 6h13" />
+            <path d="M8 12h13" />
+            <path d="M8 18h13" />
+            <path d="M3 6h.01" />
+            <path d="M3 12h.01" />
+            <path d="M3 18h.01" />
+          </svg>
+        ),
+      },
+      {
+        id: "plants-problems",
+        path: "/problems",
+        label: "Проблемы и решения",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 21v-4" />
+            <path d="M8 21v-2" />
+            <path d="M12 21v-6" />
+            <path d="M16 21v-4" />
+            <path d="M20 21V8" />
+            <path d="M22 7 12 3 2 7" />
+            <path d="M18 17h4" />
+            <path d="M2 21h20" />
+          </svg>
+        ),
+      },
       {
         id: "plants-pests",
         path: "/pests",
@@ -123,7 +137,7 @@ const NAV = [
       {
         id: "plants-diseases",
         path: "/diseases",
-        label: "Заболевания",
+        label: "Болезни",
         icon: (
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 12a9 9 0 1 1-9-9" />
@@ -149,6 +163,7 @@ const NAV = [
       { id: "plants-settings", path: "/plants/settings", label: "Настройки", perm: "plants_admin" },
     ],
   },
+
   {
     id: "accounting",
     label: "Финансы",
@@ -231,17 +246,25 @@ function ItemIcon({ children, active, onClick, label }) {
   const className = `sidebar__link-icon ${active ? "is-active" : ""}`;
   if (onClick) {
     return (
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         onClick={(e) => {
           e.stopPropagation();
           onClick();
         }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            onClick();
+          }
+        }}
         className={className}
-        aria-label={label || "Открыть"}
+        aria-label={label || "�?�'��?�<�'�?"}
       >
         {children}
-      </button>
+      </span>
     );
   }
   return <span className={className}>{children}</span>;
@@ -372,8 +395,10 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile = () => {} }
                       }`
                     }
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {child.label}
+                    <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/70 text-slate-500 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-300 dark:ring-white/5">
+                      {child.icon || <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                    </span>
+                    <span className="flex-1">{child.label}</span>
                   </NavLink>
                 ))}
               </motion.div>

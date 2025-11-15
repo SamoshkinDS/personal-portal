@@ -6,7 +6,6 @@ const EMPTY_DOC = { type: "doc", content: [] };
 const DEFAULT_FORM = {
   name: "",
   description: "",
-  photo_url: "",
   reason: "",
   disease_type: "",
   symptoms: "",
@@ -23,9 +22,11 @@ export default function DiseaseFormModal({ open, onClose, initialValue, onSubmit
 
   React.useEffect(() => {
     if (!open) return;
+    const baseValue = initialValue ? { ...initialValue } : {};
+    delete baseValue.photo_url;
     setForm({
       ...DEFAULT_FORM,
-      ...(initialValue || {}),
+      ...baseValue,
       treatment_text: initialValue?.treatment_text || EMPTY_DOC,
       treatment_text_plain: initialValue?.treatment_text_plain || "",
     });
@@ -60,28 +61,17 @@ export default function DiseaseFormModal({ open, onClose, initialValue, onSubmit
         maxWidth="max-w-3xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4 text-slate-900 dark:text-slate-100">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-slate-600 dark:text-slate-300">Название *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={handleChange("name")}
-                required
-                className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-sm outline-none focus:border-blue-400 dark:border-white/10 dark:bg-slate-900/60 dark:text-white"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-slate-600 dark:text-slate-300">Фото (URL)</label>
-              <input
-                type="url"
-                value={form.photo_url || ""}
-                onChange={handleChange("photo_url")}
-                className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-sm outline-none focus:border-blue-400 dark:border-white/10 dark:bg-slate-900/60 dark:text-white"
-                placeholder="https://..."
-              />
-            </div>
+          <div className="space-y-1">
+            <label className="text-sm font-semibold text-slate-600 dark:text-slate-300">??????????????? *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={handleChange("name")}
+              required
+              className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-sm outline-none focus:border-blue-400 dark:border-white/10 dark:bg-slate-900/60 dark:text-white"
+            />
           </div>
+
           <div className="space-y-1">
             <label className="text-sm font-semibold text-slate-600 dark:text-slate-300">Описание</label>
             <textarea

@@ -15,11 +15,16 @@ export async function registerPush() {
       await sendSubscription(existing);
       return true;
     }
-    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-    const subscribeOptions = { userVisibleOnly: true };
-    if (vapidKey) {
-      subscribeOptions.applicationServerKey = urlBase64ToUint8Array(vapidKey);
+    const vapidKey = await resolveVapidPublicKey();
+    if (!vapidKey) {
+      // Surface the misconfiguration that caused the browser error
+      console.error('registerPush: Missing VAPID public key (env or /api/notifications/public-key)');
+      return false;
     }
+    const subscribeOptions = {
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey), // Convert base64 key into the Uint8Array required by subscribe()
+    };
     const sub = await reg.pushManager.subscribe(subscribeOptions);
     await sendSubscription(sub);
     return true;
@@ -27,6 +32,24 @@ export async function registerPush() {
     // eslint-disable-next-line no-console
     console.warn('registerPush error', e);
     return false;
+  }
+}
+
+async function resolveVapidPublicKey() {
+  const envKey = (import.meta.env.VITE_VAPID_PUBLIC_KEY || '').trim();
+  if (envKey) return envKey;
+  try {
+    const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+    const url = `${base || ''}/api/notifications/public-key`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch VAPID key (${res.status})`);
+    }
+    const data = await res.json();
+    return (data?.publicKey || '').trim();
+  } catch (e) {
+    console.error('registerPush: Unable to fetch VAPID public key from server', e);
+    return '';
   }
 }
 
@@ -56,4 +79,3 @@ async function sendSubscription(sub) {
     // ignore
   }
 }
-

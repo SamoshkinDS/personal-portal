@@ -1,9 +1,11 @@
 // encoding: utf-8
 import React from "react";
 import { apiAuthFetch } from "../utils/api.js";
-import { idbPut, idbDelete, idbGetAll, idbClear } from "../utils/idb.js";
+import { idbPut, idbDelete, idbGetAll, idbClear, IDB_STORES } from "../utils/idb.js";
 
-const STORE = "unread_notifications";
+const UNREAD_STORE = IDB_STORES.UNREAD;
+const READ_STORE = IDB_STORES.READ;
+const READ_HISTORY_LIMIT = 500;
 
 export default function useNotifications() {
   const [unread, setUnread] = React.useState([]);
@@ -14,7 +16,7 @@ export default function useNotifications() {
 
   const loadUnreadFromIDB = React.useCallback(async () => {
     try {
-      const items = await idbGetAll(STORE);
+      const items = await idbGetAll(UNREAD_STORE);
       items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
       setUnread(items);
     } catch (e) {
@@ -36,11 +38,13 @@ export default function useNotifications() {
         body: n.body || "",
         created_at: n.created_at,
       }));
-      const current = await idbGetAll(STORE);
+      const current = await idbGetAll(UNREAD_STORE);
       const currentIds = new Set(current.map((item) => item.id));
+      const readIds = await loadReadIds();
       for (const item of serverItems) {
+        if (readIds.has(item.id)) continue;
         if (!currentIds.has(item.id)) {
-          await idbPut(STORE, item);
+          await idbPut(UNREAD_STORE, item);
         }
       }
       await loadUnreadFromIDB();
@@ -52,14 +56,25 @@ export default function useNotifications() {
   }, [loadUnreadFromIDB]);
 
   const markRead = React.useCallback(async (id) => {
-    await idbDelete(STORE, id);
     setUnread((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await idbDelete(UNREAD_STORE, id);
+      await rememberAsRead([id]);
+    } catch (e) {
+      console.warn("Failed to persist read notification state", e);
+    }
   }, []);
 
   const markAllRead = React.useCallback(async () => {
-    await idbClear(STORE);
+    const ids = unread.map((n) => n.id);
     setUnread([]);
-  }, []);
+    try {
+      await idbClear(UNREAD_STORE);
+      await rememberAsRead(ids);
+    } catch (e) {
+      console.warn("Failed to persist read notifications", e);
+    }
+  }, [unread]);
 
   React.useEffect(() => {
     loadUnreadFromIDB();
@@ -88,4 +103,39 @@ export default function useNotifications() {
     markRead,
     markAllRead,
   };
+}
+
+async function loadReadIds() {
+  try {
+    const items = await idbGetAll(READ_STORE);
+    return new Set(items.map((item) => item.id));
+  } catch (e) {
+    console.warn("Failed to read notification history", e);
+    return new Set();
+  }
+}
+
+async function rememberAsRead(ids) {
+  if (!ids || ids.length === 0) return;
+  const timestamp = Date.now();
+  try {
+    await Promise.all(
+      ids.map((id, index) => idbPut(READ_STORE, { id, read_at: timestamp + index }))
+    );
+    await trimReadHistory();
+  } catch (e) {
+    console.warn("Failed to store read notifications", e);
+  }
+}
+
+async function trimReadHistory() {
+  try {
+    const rows = await idbGetAll(READ_STORE);
+    if (rows.length <= READ_HISTORY_LIMIT) return;
+    rows.sort((a, b) => (b.read_at || 0) - (a.read_at || 0));
+    const stale = rows.slice(READ_HISTORY_LIMIT);
+    await Promise.all(stale.map((row) => idbDelete(READ_STORE, row.id)));
+  } catch (e) {
+    console.warn("Failed to trim read notification history", e);
+  }
 }

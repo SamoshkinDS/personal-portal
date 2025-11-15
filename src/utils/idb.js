@@ -1,13 +1,27 @@
 // encoding: utf-8
 
-export function openDB(name = 'portal', version = 1, upgradeCb) {
+const DB_NAME = "portal";
+const DB_VERSION = 2;
+const STORES = [
+  { name: "unread_notifications", options: { keyPath: "id" } },
+  { name: "read_notifications", options: { keyPath: "id" } },
+];
+
+export const IDB_STORES = {
+  UNREAD: "unread_notifications",
+  READ: "read_notifications",
+};
+
+export function openDB(name = DB_NAME, version = DB_VERSION, upgradeCb) {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(name, version);
     req.onupgradeneeded = (event) => {
       const db = req.result;
-      if (!db.objectStoreNames.contains('unread_notifications')) {
-        db.createObjectStore('unread_notifications', { keyPath: 'id' });
-      }
+      STORES.forEach((store) => {
+        if (!db.objectStoreNames.contains(store.name)) {
+          db.createObjectStore(store.name, store.options);
+        }
+      });
       if (upgradeCb) upgradeCb(db, event.oldVersion, event.newVersion);
     };
     req.onsuccess = () => resolve(req.result);
@@ -54,4 +68,3 @@ export async function idbClear(store) {
     tx.onerror = () => reject(tx.error);
   });
 }
-

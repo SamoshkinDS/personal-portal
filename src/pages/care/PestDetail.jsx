@@ -8,6 +8,7 @@ import { pestsApi } from "../../api/care.js";
 import PestFormModal from "./components/PestFormModal.jsx";
 import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
 import MedicinesSelectModal from "./components/MedicinesSelectModal.jsx";
+import CareCoverCard from "./components/CareCoverCard.jsx";
 import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 
 const EMPTY_DOC = { type: "doc", content: [] };
@@ -30,6 +31,7 @@ export default function PestDetail() {
   const [medicineModalOpen, setMedicineModalOpen] = React.useState(false);
   const [medicinesSaving, setMedicinesSaving] = React.useState(false);
   const [removingMedicineId, setRemovingMedicineId] = React.useState(null);
+  const [photoUploading, setPhotoUploading] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -101,6 +103,21 @@ export default function PestDetail() {
     }
   };
 
+
+  const handlePhotoUpload = async (file) => {
+    if (!pest || !file) return;
+    setPhotoUploading(true);
+    try {
+      const res = await pestsApi.uploadPhoto(pest.id, file);
+      setPest(res.item);
+      toast.success("Фото обновлено");
+    } catch (err) {
+      toast.error(err.message || "Не удалось обновить фото");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const articleHtml = React.useMemo(() => {
     if (!pest?.fight_text) return "";
     try {
@@ -160,13 +177,15 @@ export default function PestDetail() {
         pest && (
           <>
             <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
-              <div className="overflow-hidden rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50 to-orange-50 shadow-sm dark:border-rose-400/20 dark:from-rose-900/40 dark:to-orange-900/20">
-                {pest.photo_url ? (
-                  <img src={pest.photo_url} alt={pest.name} className="h-full w-full object-cover" loading="lazy" />
-                ) : (
-                  <div className="flex h-72 items-center justify-center text-6xl">🐛</div>
-                )}
-              </div>
+              <CareCoverCard
+                photoUrl={pest.photo_url}
+                name={pest.name}
+                placeholder="??"
+                canManage={canManage}
+                uploading={photoUploading}
+                onUpload={handlePhotoUpload}
+                className="border-rose-100 bg-gradient-to-br from-rose-50 to-orange-50 dark:border-rose-400/20 dark:from-rose-900/40 dark:to-orange-900/20"
+              />
               <div className="space-y-6">
                 <div className="flex flex-wrap gap-3">
                   <span className="rounded-full bg-rose-100 px-4 py-1 text-xs font-semibold uppercase tracking-wider text-rose-600 dark:bg-rose-400/10 dark:text-rose-100">

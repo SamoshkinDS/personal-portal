@@ -12,7 +12,7 @@ export default defineConfig({
 
   // ⚙️ Игнорируем ворнинги вида "use client" из framer-motion
   build: {
-    chunkSizeWarningLimit: 1700,
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       onwarn(warning, warn) {
         if (

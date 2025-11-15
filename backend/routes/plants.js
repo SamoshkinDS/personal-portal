@@ -7,6 +7,7 @@ import { pool } from "../db/connect.js";
 import { authRequired, requirePermission } from "../middleware/auth.js";
 import { ensureUniquePlantSlug } from "../utils/slugify.js";
 import { uploadBuffer, deleteByKey, isS3Ready } from "../services/s3Client.js";
+import { normalizeUploadFile, getExtension } from "../utils/imageUpload.js";
 
 const router = express.Router();
 
@@ -655,10 +656,10 @@ router.post("/:id/image/main", requirePermission("plants_admin"), upload.single(
     if (!req.file) return res.status(400).json({ message: "file is required" });
     if (!isS3Ready()) return res.status(400).json({ message: "S3 is not configured" });
 
-    const ext = getExtension(req.file);
-    if (!ext) return res.status(400).json({ message: "Unsupported file type" });
+    const normalizedFile = await normalizeUploadFile(req.file);
+    const ext = normalizedFile.extension;
 
-    const previewBuffer = await sharp(req.file.buffer)
+    const previewBuffer = await sharp(normalizedFile.buffer)
       .rotate()
       .resize({ width: PREVIEW_WIDTH, withoutEnlargement: true })
       .webp({ quality: PREVIEW_QUALITY });
@@ -672,7 +673,7 @@ router.post("/:id/image/main", requirePermission("plants_admin"), upload.single(
     if (!current) return res.status(404).json({ message: "Plant not found" });
 
     const [mainUrl, previewUrl] = await Promise.all([
-      uploadBuffer({ key: mainKey, body: req.file.buffer, contentType: req.file.mimetype }),
+      uploadBuffer({ key: mainKey, body: normalizedFile.buffer, contentType: normalizedFile.mimetype }),
       uploadBuffer({
         key: previewKey,
         body: previewBuffer,
@@ -721,22 +722,22 @@ router.post("/:id/image/gallery", requirePermission("plants_admin"), upload.arra
       [id]
     );
     let nextOrder = Number(orderRow.rows[0]?.max_order ?? -1) + 1;
+    const normalizedFiles = await Promise.all(files.map(normalizeUploadFile));
 
     const uploads = [];
-    for (const file of files) {
-      const ext = getExtension(file);
-      if (!ext) {
-        return res.status(400).json({ message: `Unsupported file type: ${file.originalname}` });
-      }
+    for (let idx = 0; idx < files.length; idx += 1) {
+      const file = files[idx];
+      const normalizedFile = normalizedFiles[idx];
+      const ext = normalizedFile.extension;
       const photoId = uuidv4();
       const mainKey = `plants/${id}/gallery/${photoId}.${ext}`;
       const previewKey = `plants/${id}/gallery/${photoId}_preview.webp`;
-      const previewBuffer = await sharp(file.buffer)
+      const previewBuffer = await sharp(normalizedFile.buffer)
         .rotate()
         .resize({ width: PREVIEW_WIDTH, withoutEnlargement: true })
         .webp({ quality: PREVIEW_QUALITY });
       const [imageUrl, previewUrl] = await Promise.all([
-        uploadBuffer({ key: mainKey, body: file.buffer, contentType: file.mimetype }),
+        uploadBuffer({ key: mainKey, body: normalizedFile.buffer, contentType: normalizedFile.mimetype }),
         uploadBuffer({
           key: previewKey,
           body: previewBuffer,
@@ -844,8 +845,29 @@ router.delete("/:id", requirePermission("plants_admin"), async (req, res) => {
   try {
     const plantId = await resolvePlantId(req.params.id);
     if (!plantId) return res.status(404).json({ message: "Plant not found" });
+    const [plantRow, galleryRows] = await Promise.all([
+      pool.query(
+        "SELECT main_image_key, main_preview_key FROM plants WHERE id = $1",
+        [plantId]
+      ),
+      pool.query(
+        "SELECT image_key, preview_key FROM plant_images WHERE plant_id = $1",
+        [plantId]
+      ),
+    ]);
     const deleted = await pool.query("DELETE FROM plants WHERE id = $1 RETURNING id", [plantId]);
     if (!deleted.rows.length) return res.status(404).json({ message: "Plant not found" });
+    if (isS3Ready()) {
+      const keys = [];
+      const main = plantRow.rows[0];
+      if (main?.main_image_key) keys.push(main.main_image_key);
+      if (main?.main_preview_key) keys.push(main.main_preview_key);
+      galleryRows.rows.forEach((row) => {
+        if (row.image_key) keys.push(row.image_key);
+        if (row.preview_key) keys.push(row.preview_key);
+      });
+      keys.forEach((key) => deleteByKey(key));
+    }
     res.json({ message: "Plant removed" });
   } catch (error) {
     console.error("DELETE /api/plants/:id", error);
@@ -1487,14 +1509,6 @@ function valuesEqual(a, b) {
   return String(a) === String(b);
 }
 
-function getExtension(file) {
-  if (!file?.mimetype) return null;
-  if (file.mimetype === "image/jpeg") return "jpg";
-  if (file.mimetype === "image/png") return "png";
-  if (file.mimetype === "image/webp") return "webp";
-  const match = file.originalname?.match(/\.([a-z0-9]+)$/i);
-  return match ? match[1].toLowerCase() : null;
-}
 
 function respondError(res, error, fallback) {
   if (error?.status && Number.isInteger(error.status)) {

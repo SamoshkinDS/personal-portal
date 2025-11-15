@@ -24,15 +24,22 @@ export function configureWebPushFromEnv() {
 
 export async function sendPushToAll(title, body, url = '/') {
   if (!configured) return { sent: 0 };
-  const q = await pool.query('SELECT data FROM push_subscriptions');
-  const subs = q.rows.map(r => r.data).filter(Boolean);
+  const q = await pool.query('SELECT endpoint, data FROM push_subscriptions');
+  const subs = q.rows.map(r => ({ endpoint: r.endpoint, data: r.data })).filter(r => r.data);
   let sent = 0;
-  await Promise.allSettled(subs.map(async (sub) => {
+  await Promise.allSettled(subs.map(async ({ endpoint, data }) => {
     try {
-      await webpush.sendNotification(sub, JSON.stringify({ title, body, url }));
+      await webpush.sendNotification(data, JSON.stringify({ title, body, url }));
       sent++;
     } catch (e) {
-      console.warn('[push] failed to send to one subscription', e?.statusCode || e?.message || e);
+      const status = e?.statusCode;
+      if (status === 404 || status === 410) {
+        // Browsers drop push subscriptions when they expire; remove them so we stop retrying
+        await deleteSubscription(endpoint);
+        console.warn('[push] removed stale subscription', endpoint, status);
+      } else {
+        console.warn('[push] failed to send to one subscription', status || e?.message || e);
+      }
     }
   }));
   return { sent };
@@ -40,18 +47,34 @@ export async function sendPushToAll(title, body, url = '/') {
 
 export async function sendPushToUser(userId, title, body, url = '/') {
   if (!configured || !userId) return { sent: 0 };
-  const q = await pool.query('SELECT data FROM push_subscriptions WHERE user_id = $1', [userId]);
-  const subs = q.rows.map(r => r.data).filter(Boolean);
+  const q = await pool.query('SELECT endpoint, data FROM push_subscriptions WHERE user_id = $1', [userId]);
+  const subs = q.rows.map(r => ({ endpoint: r.endpoint, data: r.data })).filter(r => r.data);
   let sent = 0;
-  await Promise.allSettled(subs.map(async (sub) => {
+  await Promise.allSettled(subs.map(async ({ endpoint, data }) => {
     try {
-      await webpush.sendNotification(sub, JSON.stringify({ title, body, url }));
+      await webpush.sendNotification(data, JSON.stringify({ title, body, url }));
       sent++;
     } catch (e) {
-      console.warn('[push] failed to send to subscription', e?.statusCode || e?.message || e);
+      const status = e?.statusCode;
+      if (status === 404 || status === 410) {
+        // Browsers drop push subscriptions when they expire; remove them so we stop retrying
+        await deleteSubscription(endpoint);
+        console.warn('[push] removed stale subscription for user', userId, status);
+      } else {
+        console.warn('[push] failed to send to subscription', status || e?.message || e);
+      }
     }
   }));
   return { sent };
+}
+
+async function deleteSubscription(endpoint) {
+  if (!endpoint) return;
+  try {
+    await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+  } catch (e) {
+    console.warn('[push] failed to delete stale subscription', e?.message || e);
+  }
 }
 
 // auto-configure on import

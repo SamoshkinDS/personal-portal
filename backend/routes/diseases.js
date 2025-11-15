@@ -1,6 +1,22 @@
+import multer from "multer";
+import { v4 as uuidv4 } from "uuid";
 import { createCareCatalogRouter, EMPTY_RICH_DOC } from "./careCatalogFactory.js";
 import { pool } from "../db/connect.js";
 import { requirePermission } from "../middleware/auth.js";
+import { normalizeUploadFile } from "../utils/imageUpload.js";
+import { uploadBuffer, deleteByKey, isS3Ready } from "../services/s3Client.js";
+
+const IMAGE_MAX_MB = Number(process.env.CARE_IMAGE_MAX_MB) || 8;
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: IMAGE_MAX_MB * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!/^image\//i.test(file.mimetype)) {
+      return cb(new Error("Unsupported file type"));
+    }
+    cb(null, true);
+  },
+});
 
 function buildDiseaseFilters(query, alias, params) {
   const filters = [];
@@ -66,6 +82,7 @@ const diseasesRouter = createCareCatalogRouter({
   entityLabel: "Заболевание",
   historyTable: "diseases_history",
   historyEntityColumn: "disease_id",
+  photoFolder: "care/diseases",
   listSelect: `
     d.id, d.slug, d.name, d.description, d.photo_url,
     d.disease_type, d.reason, d.updated_at
@@ -119,6 +136,52 @@ const diseasesRouter = createCareCatalogRouter({
   mapListRow: mapDiseaseListRow,
   mapDetailRow: mapDiseaseDetailRow,
 });
+
+diseasesRouter.post(
+  "/:id/photo",
+  requirePermission("plants_admin"),
+  photoUpload.single("file"),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id" });
+      if (!req.file) return res.status(400).json({ message: "file is required" });
+      if (!isS3Ready()) return res.status(400).json({ message: "S3 is not configured" });
+
+      const normalized = await normalizeUploadFile(req.file);
+      const key = `care/diseases/${id}/${uuidv4()}.${normalized.extension}`;
+      const existing = await pool.query("SELECT photo_key FROM diseases WHERE id = $1", [id]);
+      if (!existing.rows.length) return res.status(404).json({ message: "Disease not found" });
+
+      const photoUrl = await uploadBuffer({
+        key,
+        body: normalized.buffer,
+        contentType: normalized.mimetype,
+        cacheControl: "public, max-age=31536000",
+      });
+
+      const updated = await pool.query(
+        `UPDATE diseases
+         SET photo_url = $1,
+             photo_key = $2,
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [photoUrl, key, id]
+      );
+
+      const prevKey = existing.rows[0]?.photo_key;
+      if (prevKey && prevKey !== key) {
+        deleteByKey(prevKey);
+      }
+
+      res.json({ item: mapDiseaseDetailRow(updated.rows[0]) });
+    } catch (error) {
+      console.error("POST /api/diseases/:id/photo", error);
+      return res.status(500).json({ message: "Failed to upload photo" });
+    }
+  }
+);
 
 diseasesRouter.post("/:id/medicines", requirePermission("plants_admin"), async (req, res) => {
   try {

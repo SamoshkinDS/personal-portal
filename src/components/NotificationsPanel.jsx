@@ -24,23 +24,25 @@ export default function NotificationsPanel({
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div
-        className={`absolute inset-0 bg-slate-900/40 transition-opacity duration-300 ${
-          open ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        onClick={onClose}
-      />
+    <>
+      {/* Raise the notification sheet above the sticky header so it isn't obscured on desktop */}
+      <div className="fixed inset-0 z-[60] flex justify-end">
+        <div
+          className={`absolute inset-0 bg-slate-900/40 transition-opacity duration-300 ${
+            open ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          onClick={onClose}
+        />
 
-      <aside
-        className={`relative h-full w-full max-w-md transform-gpu transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Центр уведомлений"
-      >
-        <div className="flex h-full flex-col gap-4 rounded-l-3xl bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 backdrop-blur-md dark:bg-slate-900/95 dark:ring-white/5">
+        <aside
+          className={`relative h-full w-full max-w-md transform-gpu transition-transform duration-300 ease-out ${
+            open ? "translate-x-0" : "translate-x-full"
+          }`}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Центр уведомлений"
+        >
+          <div className="flex h-full flex-col gap-4 rounded-l-3xl bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 backdrop-blur-md dark:bg-slate-900/95 dark:ring-white/5">
           <header className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Центр уведомлений</h3>
@@ -132,8 +134,9 @@ export default function NotificationsPanel({
             </button>
             <span>Всего: {items?.length || 0}</span>
           </footer>
-        </div>
-      </aside>
-    </div>
+          </div>
+        </aside>
+      </div>
+    </>
   );
 }
