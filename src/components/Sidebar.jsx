@@ -29,8 +29,28 @@ const NAV = [
       </svg>
     ),
     children: [
-      { id: "analytics-home", path: "/analytics", label: "Главная" },
+      { id: "analytics-home", path: "/analytics", label: "Обзор аналитики" },
       { id: "analytics-queue", path: "/analytics/queue", label: "Очередь статей" },
+      {
+        id: "analytics-interview",
+        path: "/analytics/interview",
+        label: "Подготовка к интервью",
+      },
+      {
+        id: "analytics-cheats",
+        path: "/analytics/cheats",
+        label: "Шпаргалки",
+      },
+      {
+        id: "analytics-tests",
+        path: "/analytics/tests",
+        label: "Тестирование знаний",
+      },
+      {
+        id: "analytics-settings",
+        path: "/analytics/settings",
+        label: "Настройки интеграций",
+      },
     ],
   },
   {

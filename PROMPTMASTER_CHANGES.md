@@ -1,22 +1,21 @@
-Промтмастер внедрён как новая страница внутри AI & ML.
+Промтмастер обновлён: добавлены модальные формы создания контента и настройки webhook.
 
 ## Что сделано
-- Добавлена страница `/ai/promptmaster` с отправкой запросов, очередью и библиотекой промтов.
-- Реализованы API и схемы БД для очереди (prompt_requests) и каталога (prompt_categories/prompt_articles) с начальными данными.
-- Встроены вебхуки для передачи запросов в n8n и приёма готовых промтов, плюс стартовые хлебные крошки/карточки в UI.
+- Страница `/ai/promptmaster`: кнопка «Добавить +» с модалкой для создания промта или папки; добавленный контент сразу появляется в каталоге.
+- Кнопка «Настройки»: модалка с полями webhook-url/token/response-token, значения сохраняются в БД (prompt_settings) и используются, если env не заданы.
+- API и схемы расширены: prompt_settings, эндпоинты GET/POST `/api/promptmaster/settings`, создание категорий/статей остаётся доступным; вебхук берёт URL/токен из env или БД.
+- UI и API-обёртка обновлены, документация дополнена актуальными маршрутами и настройками.
 
 ## Архитектура
-- Frontend: `src/pages/Promptmaster.jsx` опирается на `src/api/promptmaster.js`, использует PageShell, бейджи статусов, раскрытие таблицы, панель деталей статьи. Путь и пункт меню добавлены в `src/router.jsx` и `src/components/Sidebar.jsx`.
-- Backend: `backend/routes/promptmaster.js` обслуживает очередь, библиотеку, пересылку webhook и обратный ответ от n8n. Схема в `backend/db/promptmasterSchema.js` создаёт таблицы, индексы, триггеры и сирит стартовые категории/статьи.
-- Инициализация: `backend/index.js` подключает новые маршруты и ensurePromptmasterSchema.
+- Frontend: `src/pages/Promptmaster.jsx` (модалки Добавить/Настройки, формы промта/папки, детальная панель), `src/api/promptmaster.js` (settings, createCategory/createArticle). Навигация без изменений.
+- Backend: `backend/routes/promptmaster.js` (новые GET/POST settings, создание категорий/статей, fallback к настройкам из prompt_settings), схема `backend/db/promptmasterSchema.js` добавляет prompt_settings с триггером set_updated_at.
+- Документация: `docs/PROMPTMASTER.md` обновлена под новые маршруты и UI.
 
 ## Настройки и интеграция
-- `PROMPTMASTER_WEBHOOK_URL` — адрес webhook в n8n для исходящих запросов (POST body `{ request_id, query }`).
-- `PROMPTMASTER_WEBHOOK_TOKEN` — опциональный Bearer для этого вызова.
-- `PROMPTMASTER_RESPONSE_TOKEN` — если задан, обязателен в `x-promptmaster-token` или ?token= при POST `/api/promptmaster/response` от n8n.
-- Доступ контролируется правом `view_ai`, как и остальные страницы AI.
+- Env приоритетны: `PROMPTMASTER_WEBHOOK_URL`, `PROMPTMASTER_WEBHOOK_TOKEN`, `PROMPTMASTER_RESPONSE_TOKEN`. Если не заданы, используются значения из prompt_settings.
+- Настройки редактируются через UI (модалка «Настройки», доступна при `view_ai`).
 
-## API и данные
-- Очередь: POST `/api/promptmaster/requests` (создать + вызвать webhook), GET `/api/promptmaster/requests` (лист), POST `/api/promptmaster/webhook` (ручной resend), POST `/api/promptmaster/response` (ответ n8n, status/result_prompt).
-- Библиотека: GET `/api/promptmaster/categories` (root или parentId), GET `/api/promptmaster/categories/:id`, GET `/api/promptmaster/articles/:id`.
-- Таблицы: prompt_requests, prompt_categories, prompt_articles, статусы draft/sent/processing/done/error.
+## API
+- Очередь: POST `/api/promptmaster/requests`, GET `/api/promptmaster/requests`, POST `/api/promptmaster/webhook`, POST `/api/promptmaster/response`.
+- Каталог: GET `/api/promptmaster/categories[?parentId|all=true]`, GET `/api/promptmaster/categories/:id`, POST `/api/promptmaster/categories`, GET `/api/promptmaster/articles/:id`, POST `/api/promptmaster/articles`.
+- Настройки: GET `/api/promptmaster/settings`, POST `/api/promptmaster/settings`.

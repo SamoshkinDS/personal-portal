@@ -54,9 +54,41 @@ export const promptmasterApi = {
     const res = await apiAuthFetch(`/api/promptmaster/categories${buildQuery({ parentId })}`);
     return jsonOrThrow(res, "Не удалось загрузить категории");
   },
+  async listAllCategories() {
+    const res = await apiAuthFetch(`/api/promptmaster/categories${buildQuery({ all: true })}`);
+    return jsonOrThrow(res, "Не удалось загрузить список папок");
+  },
+  async createCategory(payload) {
+    const res = await apiAuthFetch("/api/promptmaster/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return jsonOrThrow(res, "Не удалось создать папку");
+  },
   async getCategory(id) {
     const res = await apiAuthFetch(`/api/promptmaster/categories/${id}`);
     return jsonOrThrow(res, "Не удалось загрузить категорию");
+  },
+  async createArticle(payload) {
+    const res = await apiAuthFetch("/api/promptmaster/articles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return jsonOrThrow(res, "Не удалось создать промт");
+  },
+  async getSettings() {
+    const res = await apiAuthFetch("/api/promptmaster/settings");
+    return jsonOrThrow(res, "Не удалось загрузить настройки");
+  },
+  async saveSettings(payload) {
+    const res = await apiAuthFetch("/api/promptmaster/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return jsonOrThrow(res, "Не удалось сохранить настройки");
   },
   async getArticle(id) {
     const res = await apiAuthFetch(`/api/promptmaster/articles/${id}`);

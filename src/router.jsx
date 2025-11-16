@@ -16,6 +16,11 @@ import Analytics from "./pages/Analytics.jsx";
 import TopicPage from "./pages/analytics/Topic.jsx";
 import ArticlePage from "./pages/analytics/Article.jsx";
 import ArticlesQueuePage from "./pages/analytics/Queue.jsx";
+import InterviewPreparation from "./pages/analytics/InterviewPreparation.jsx";
+import KnowledgeTestsPage from "./pages/analytics/KnowledgeTests.jsx";
+import TestDetail from "./pages/analytics/TestDetail.jsx";
+import IntegrationSettings from "./pages/analytics/IntegrationSettings.jsx";
+import CheatSheets from "./pages/analytics/CheatSheets.jsx";
 import AI from "./pages/AI.jsx";
 import N8NIntegration from "./pages/N8NIntegration.jsx";
 import Promptmaster from "./pages/Promptmaster.jsx";
@@ -242,6 +247,56 @@ export const router = createBrowserRouter(
             <PermissionGate check={canViewAnalytics}>
               <RouteTransition>
                 <ArticlesQueuePage />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="analytics/interview"
+          element={
+            <PermissionGate check={canViewAnalytics}>
+              <RouteTransition>
+                <InterviewPreparation />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="analytics/tests"
+          element={
+            <PermissionGate check={canViewAnalytics}>
+              <RouteTransition>
+                <KnowledgeTestsPage />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="analytics/tests/:testId"
+          element={
+            <PermissionGate check={canViewAnalytics}>
+              <RouteTransition>
+                <TestDetail />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="analytics/settings"
+          element={
+            <PermissionGate check={canViewAnalytics}>
+              <RouteTransition>
+                <IntegrationSettings />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="analytics/cheats"
+          element={
+            <PermissionGate check={canViewAnalytics}>
+              <RouteTransition>
+                <CheatSheets />
               </RouteTransition>
             </PermissionGate>
           }

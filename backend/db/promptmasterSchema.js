@@ -162,6 +162,14 @@ export async function ensurePromptmasterSchema() {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS prompt_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_prompt_requests_status ON prompt_requests(status);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_prompt_categories_parent ON prompt_categories(parent_category_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_prompt_articles_category ON prompt_articles(category_id);`);
@@ -184,6 +192,12 @@ export async function ensurePromptmasterSchema() {
       IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'prompt_articles_set_updated_at') THEN
         CREATE TRIGGER prompt_articles_set_updated_at
         BEFORE UPDATE ON prompt_articles
+        FOR EACH ROW
+        EXECUTE FUNCTION set_updated_at();
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'prompt_settings_set_updated_at') THEN
+        CREATE TRIGGER prompt_settings_set_updated_at
+        BEFORE UPDATE ON prompt_settings
         FOR EACH ROW
         EXECUTE FUNCTION set_updated_at();
       END IF;

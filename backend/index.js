@@ -23,11 +23,19 @@ import medicinesRoutes from "./routes/medicines.js";
 import problemsRoutes from "./routes/problems.js";
 import { analyticsRouter, articlesQueueRouter, articlesRouter } from "./routes/analytics.js";
 import promptmasterRoutes from "./routes/promptmaster.js";
+import cheatRoutes from "./routes/cheat.js";
+import interviewRoutes from "./routes/interview.js";
+import testsRoutes from "./routes/tests.js";
+import integrationSettingsRoutes from "./routes/integrationSettings.js";
 import { pool } from "./db/connect.js";
 import { ensurePlantsSchema } from "./db/plantsSchema.js";
 import { ensureCareCatalogSchema } from "./db/careSchema.js";
 import { ensureAnalyticsSchema } from "./db/analyticsSchema.js";
+import { ensureCheatSchema } from "./db/cheatSchema.js";
 import { ensurePromptmasterSchema } from "./db/promptmasterSchema.js";
+import { ensureInterviewSchema } from "./db/interviewSchema.js";
+import { ensureTestsSchema } from "./db/testsSchema.js";
+import { ensureSettingsSchema } from "./db/settingsSchema.js";
 import { syncVlessStats } from "./services/xray.js";
 import {
   createUtilityPlaceholders,
@@ -66,9 +74,13 @@ app.use("/api/pests", pestsRoutes);
 app.use("/api/diseases", diseasesRoutes);
 app.use("/api/medicines", medicinesRoutes);
 app.use("/api/problems", problemsRoutes);
-app.use("/api/analytics", analyticsRouter);
 app.use("/api/articles-queue", articlesQueueRouter);
 app.use("/api/articles", articlesRouter);
+app.use("/api/cheats", cheatRoutes);
+app.use("/api/tests", testsRoutes);
+app.use("/api/integration", integrationSettingsRoutes);
+app.use("/api/analytics", analyticsRouter);
+app.use("/api/interview", interviewRoutes);
 app.use("/api/promptmaster", promptmasterRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
@@ -487,6 +499,10 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureCareCatalogSchema();
     await ensurePlantsSchema();
     await ensureAnalyticsSchema();
+    await ensureCheatSchema();
+    await ensureTestsSchema();
+    await ensureInterviewSchema();
+    await ensureSettingsSchema();
     await ensurePromptmasterSchema();
     console.log("DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, plants, pests, diseases, medicines, analytics, promptmaster");
   } catch (err) {
