@@ -28,6 +28,10 @@ const NAV = [
         <path d="M20 20V4" />
       </svg>
     ),
+    children: [
+      { id: "analytics-home", path: "/analytics", label: "Главная" },
+      { id: "analytics-queue", path: "/analytics/queue", label: "Очередь статей" },
+    ],
   },
   {
     id: "ai",
@@ -44,6 +48,7 @@ const NAV = [
     children: [
       { id: "ai-overview", path: "/ai", label: "Обзор" },
       { id: "ai-n8n", path: "/ai/n8n", label: "N8N" },
+      { id: "ai-promptmaster", path: "/ai/promptmaster", label: "Промтмастер" },
     ],
   },
   {

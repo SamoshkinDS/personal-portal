@@ -13,8 +13,12 @@ import { Toaster } from "react-hot-toast";
 
 import Sidebar from "./components/Sidebar.jsx";
 import Analytics from "./pages/Analytics.jsx";
+import TopicPage from "./pages/analytics/Topic.jsx";
+import ArticlePage from "./pages/analytics/Article.jsx";
+import ArticlesQueuePage from "./pages/analytics/Queue.jsx";
 import AI from "./pages/AI.jsx";
 import N8NIntegration from "./pages/N8NIntegration.jsx";
+import Promptmaster from "./pages/Promptmaster.jsx";
 import Docs from "./pages/Docs.jsx";
 import Posts from "./pages/Posts.jsx";
 import Settings from "./pages/Settings.jsx";
@@ -213,6 +217,36 @@ export const router = createBrowserRouter(
           }
         />
         <Route
+          path="analytics/topics/:topicId"
+          element={
+            <PermissionGate check={canViewAnalytics}>
+              <RouteTransition>
+                <TopicPage />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="analytics/articles/:articleId"
+          element={
+            <PermissionGate check={canViewAnalytics}>
+              <RouteTransition>
+                <ArticlePage />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="analytics/queue"
+          element={
+            <PermissionGate check={canViewAnalytics}>
+              <RouteTransition>
+                <ArticlesQueuePage />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
           path="ai"
           element={
             <PermissionGate check={canUseAI}>
@@ -228,6 +262,16 @@ export const router = createBrowserRouter(
             <PermissionGate check={canUseAI}>
               <RouteTransition>
                 <N8NIntegration />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="ai/promptmaster"
+          element={
+            <PermissionGate check={canUseAI}>
+              <RouteTransition>
+                <Promptmaster />
               </RouteTransition>
             </PermissionGate>
           }
