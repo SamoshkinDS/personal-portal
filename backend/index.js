@@ -27,6 +27,7 @@ import cheatRoutes from "./routes/cheat.js";
 import interviewRoutes from "./routes/interview.js";
 import testsRoutes from "./routes/tests.js";
 import integrationSettingsRoutes from "./routes/integrationSettings.js";
+import careerRoutes from "./routes/career.js";
 import { pool } from "./db/connect.js";
 import { ensurePlantsSchema } from "./db/plantsSchema.js";
 import { ensureCareCatalogSchema } from "./db/careSchema.js";
@@ -36,6 +37,7 @@ import { ensurePromptmasterSchema } from "./db/promptmasterSchema.js";
 import { ensureInterviewSchema } from "./db/interviewSchema.js";
 import { ensureTestsSchema } from "./db/testsSchema.js";
 import { ensureSettingsSchema } from "./db/settingsSchema.js";
+import { ensureCareerSchema } from "./db/careerSchema.js";
 import { syncVlessStats } from "./services/xray.js";
 import {
   createUtilityPlaceholders,
@@ -82,6 +84,7 @@ app.use("/api/integration", integrationSettingsRoutes);
 app.use("/api/analytics", analyticsRouter);
 app.use("/api/interview", interviewRoutes);
 app.use("/api/promptmaster", promptmasterRoutes);
+app.use("/api/career", careerRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
 const ACCOUNTING_JOBS_ENABLED = String(process.env.ACCOUNTING_JOBS_DISABLED || "false").toLowerCase() !== "true";
@@ -503,6 +506,7 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureTestsSchema();
     await ensureInterviewSchema();
     await ensureSettingsSchema();
+    await ensureCareerSchema();
     await ensurePromptmasterSchema();
     console.log("DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, plants, pests, diseases, medicines, analytics, promptmaster");
   } catch (err) {

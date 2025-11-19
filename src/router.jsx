@@ -59,15 +59,37 @@ import MedicinesList from "./pages/care/MedicinesList.jsx";
 import MedicineDetail from "./pages/care/MedicineDetail.jsx";
 import ProblemsOverview from "./pages/care/ProblemsOverview.jsx";
 import { registerPush } from "./push/registerPush.js";
+import CareerDashboard from "./pages/career/Dashboard.tsx";
+import SkillsPage from "./pages/career/SkillsPage.tsx";
+import CoursesPage from "./pages/career/CoursesPage.tsx";
+import PortfolioPage from "./pages/career/PortfolioPage.tsx";
+import ProjectDetails from "./pages/career/ProjectDetails.tsx";
+import InterviewsPage from "./pages/career/InterviewsPage.tsx";
+import KnowledgePage from "./pages/career/KnowledgePage.tsx";
+import KnowledgeDetailsPage from "./pages/career/KnowledgeDetailsPage.tsx";
+import PortfolioExportPage from "./pages/career/PortfolioExportPage.tsx";
+import PortfolioTimelinePage from "./pages/career/PortfolioTimelinePage.tsx";
+import AnalyticsPage from "./pages/career/AnalyticsPage.tsx";
 
 function RouteTransition({ children }) {
+  const location = useLocation();
+  const disableRouteTransition = location.state?.disableRouteTransition;
+  const motionProps = disableRouteTransition
+    ? {
+        initial: false,
+        animate: { opacity: 1, y: 0 },
+        exit: false,
+      }
+    : {
+        initial: { opacity: 0, y: 20 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -20 },
+      };
   return (
     <motion.div
       className="app-route flex-1 overflow-y-auto"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
+      {...motionProps}
     >
       {children}
     </motion.div>
@@ -299,6 +321,94 @@ export const router = createBrowserRouter(
                 <CheatSheets />
               </RouteTransition>
             </PermissionGate>
+          }
+        />
+        <Route
+          path="career"
+          element={
+            <RouteTransition>
+              <CareerDashboard />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/skills"
+          element={
+            <RouteTransition>
+              <SkillsPage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/courses"
+          element={
+            <RouteTransition>
+              <CoursesPage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/portfolio"
+          element={
+            <RouteTransition>
+              <PortfolioPage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/portfolio/:projectId"
+          element={
+            <RouteTransition>
+              <ProjectDetails />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/interviews"
+          element={
+            <RouteTransition>
+              <InterviewsPage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/knowledge"
+          element={
+            <RouteTransition>
+              <KnowledgePage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/knowledge/:knowledgeId"
+          element={
+            <RouteTransition>
+              <KnowledgeDetailsPage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/portfolio/export"
+          element={
+            <RouteTransition>
+              <PortfolioExportPage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/portfolio/timeline"
+          element={
+            <RouteTransition>
+              <PortfolioTimelinePage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="career/analytics"
+          element={
+            <RouteTransition>
+              <AnalyticsPage />
+            </RouteTransition>
           }
         />
         <Route

@@ -13,7 +13,9 @@ AGENTS: Personal Portal
 - Основные домены:
   - Домашний дашборд и задачи (todos, списки задач, заметки).
   - Аналитика: темы, статьи, очередь публикаций, интервью, знания/тесты.
-  - AI‑разделы: общие AI‑инструменты (`AI.jsx`), интеграция с n8n, Promptmaster.
+  - AI-разделы: общие AI-инструменты (`AI.jsx`), интеграция с n8n, Promptmaster.
+  - Профессиональное развитие: навыки, курсы, портфолио, интервью и технические знания с REST-API под `/api/career`, включая `/dashboard` (кэшируется 5 минут), `/dashboard/activity` и секцию портфолио.
+- Курсы: `/career/courses` — список курсов, фильтры по статусу/платформе/периоду, прогресс/рейтинги, привязка навыков и работа с сертификатами.
   - VPN: Outline API, VLESS/Xray‑ключи и статистика.
   - Финансы: `accounting` (счета, транзакции, доходы, категории, напоминания).
   - Растения и уход: растения, вредители, болезни, лекарства, проблемы.
@@ -44,8 +46,9 @@ AGENTS: Personal Portal
 
 - Node.js (ESM, `"type": "module"`), Express (`backend/index.js`).
 - PostgreSQL через `pg` (`backend/db/connect.js`), схемы по доменам:
-  - `ensure*Schema`‑функции в `backend/db/*Schema.js` (plants, care, analytics, promptmaster, interview, tests, settings и т.д.).
-  - Дополнительные SQL‑миграции в `backend/db/migrations/*.sql`.
+  - `ensure*Schema`-функции в `backend/db/*Schema.js` (plants, care, analytics, promptmaster, interview, tests, settings и т.д.).
+  - Дополнительные SQL-миграции в `backend/db/migrations/*.sql`.
+- Career-модуль: `backend/routes/career.js`, `backend/services/careerService.js`, `backend/db/careerSchema.js` с единым форматом `{ success, data, error }` и маршрутом `/api/career`.
 - Безопасность:
   - JWT‑аутентификация через `jsonwebtoken` (`backend/controllers/authHandlers.js`, `backend/middleware/auth.js`).
   - Пароли — через `bcrypt`.
@@ -97,7 +100,7 @@ AGENTS: Personal Portal
 - `backend/` — бэкенд (Express + PostgreSQL).
 - `public/` — статические файлы (включая `sw.js`).
 - `dist/` — собранный фронтенд Vite (артефакт билда, не редактировать).
-- `docs/` — документация по блокам, интеграциям и архитектуре.
+- `docs/` — документация по блокам, интеграциям и архитектуре; добавлен `docs/Career_Core.md`.
 - `GPT_specs/` — технические задания/спеки для GPT/Codex по отдельным блокам.
 - `scripts/` — операционные скрипты (`deploy.sh`, `update_frontend.sh`, `update_backend.sh`, `sync_xray_users.sh`).
 - `images/` — статические изображения для UI/доков.
@@ -110,12 +113,19 @@ AGENTS: Personal Portal
   - `analytics/` — аналитика (темы, статьи, очередь, интервью, тесты, настройки интеграций).
   - `accounting/` — финансы.
   - `vpn/` — Outline/VLESS UI и гайды.
-  - `plants/` и `care/` — растения и уход.
-  - `admin/` — админ‑панель.
-  - базовые страницы: `Home`, `AI`, `N8NIntegration`, `Promptmaster`, `Docs`, `Settings`, `Login`, `DebugDnd`, `NotFound` и др.
+- `plants/` и `care/` — растения и уход.
+- `admin/` — админ-панель.
+- `career/` — страница дашборда профессионального развития с метриками, радаром и активностью.
+- `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`.
+- `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`, `/career/interviews`.
+- `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`, `/career/interviews`, `/career/knowledge`.
+- `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`, `/career/interviews`, `/career/knowledge`, `/career/portfolio/export`.
+- `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`, `/career/interviews`, `/career/knowledge`, `/career/portfolio/export`, `/career/portfolio/timeline`.
+- `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`, `/career/interviews`, `/career/knowledge`, `/career/portfolio/export`, `/career/portfolio/timeline`, `/career/analytics`.
+- базовые страницы: `Home`, `AI`, `N8NIntegration`, `Promptmaster`, `Docs`, `Settings`, `Login`, `DebugDnd`, `NotFound` и др.
 - `components/` — переиспользуемые компоненты (Layout, Sidebar, Header, модалки и т.п.).
 - `context/` — контексты (в первую очередь `AuthContext`).
-- `api/` — API‑клиенты поверх `apiAuthFetch` (`analytics.js`, `accounting.js`, `plants.js`, `promptmaster.js`, `integrationSettings.js` и др.).
+- `api/` — API-клиенты поверх `apiAuthFetch` (`analytics.js`, `accounting.js`, `career.js`, `plants.js`, `promptmaster.js`, `integrationSettings.js` и др.).
 - `hooks/` — кастомные хуки.
 - `push/` — логика push‑подписки и общения с `/api/notifications`.
 - `utils/` — утилиты (`api.js` и т.д.).
@@ -124,11 +134,12 @@ AGENTS: Personal Portal
 Бэкенд (`backend/`)
 
 - `index.js` — точка входа: инициализация Express, регистрация маршрутов, cron‑задачи, начальная инициализация БД.
-- `routes/` — роутеры по доменам (`auth.js`, `admin.js`, `user.js`, `todos.js`, `todoLists.js`, `posts.js`, `vpn.js`, `vless.js`, `xray.js`, `notifications.js`, `actions.js`, `n8n.js`, `notes.js`, `accounting.js`, `plants.js`, `pests.js`, `diseases.js`, `medicines.js`, `problems.js`, `analytics.js`, `promptmaster.js`, `cheat.js`, `interview.js`, `tests.js`, `integrationSettings.js` и др.).
+- `routes/` — роутеры по доменам (`auth.js`, `admin.js`, `user.js`, `todos.js`, `todoLists.js`, `posts.js`, `vpn.js`, `vless.js`, `xray.js`, `notifications.js`, `actions.js`, `n8n.js`, `notes.js`, `accounting.js`, `plants.js`, `pests.js`, `diseases.js`, `medicines.js`, `problems.js`, `analytics.js`, `promptmaster.js`, `cheat.js`, `interview.js`, `tests.js`, `integrationSettings.js`, `career.js` и др.).
 - `controllers/` — контроллеры (например, `authController.js`, `authHandlers.js`).
 - `middleware/` — middleware авторизации и прав (`auth.js`).
-- `db/` — подключение к БД (`connect.js`), схемы (`*Schema.js`), миграции (`migrations/*.sql`).
-- `services/` — интеграции и задачи (`s3Client.js`, `xray.js`, `accountingJobs.js`, `accountingUtils.js`).
+- `db/` — подключение к БД (`connect.js`), схемы (`*Schema.js`, `careerSchema.js`), миграции (`migrations/*.sql`).
+- `services/` — интеграции и задачи (`s3Client.js`, `xray.js`, `accountingJobs.js`, `accountingUtils.js`, `careerService.js`).
+- `services/` — интеграции и задачи (`s3Client.js`, `storageService.js`, `xray.js`, `accountingJobs.js`, `accountingUtils.js`, `careerService.js`).
 - `utils/` — утилиты (`slugify.js`, `imageUpload.js`, `push.js`).
 - `scripts/` — вспомогательные скрипты (например, `seedPlants.js`).
 - `proto/` — gRPC‑описания (`stats.proto`).

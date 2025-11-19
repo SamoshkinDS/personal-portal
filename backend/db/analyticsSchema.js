@@ -213,9 +213,14 @@ export async function ensureAnalyticsSchema() {
         SELECT 1 FROM information_schema.constraint_column_usage
         WHERE table_name = 'articles_queue' AND constraint_name = 'articles_queue_published_article_id_fkey'
       ) THEN
-        ALTER TABLE articles_queue
-        ADD CONSTRAINT articles_queue_published_article_id_fkey
-        FOREIGN KEY (published_article_id) REFERENCES articles(id) ON DELETE SET NULL;
+        BEGIN
+          ALTER TABLE articles_queue
+          ADD CONSTRAINT articles_queue_published_article_id_fkey
+          FOREIGN KEY (published_article_id) REFERENCES articles(id) ON DELETE SET NULL;
+        EXCEPTION WHEN duplicate_object THEN
+          -- constraint was created concurrently
+          NULL;
+        END;
       END IF;
     END$$;
   `);

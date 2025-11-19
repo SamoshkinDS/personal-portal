@@ -54,6 +54,29 @@ const NAV = [
     ],
   },
   {
+    id: "career",
+    path: "/career",
+    label: "Карьера",
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 8h18v8H3z" />
+        <path d="M9 8V5h6v3" />
+        <path d="M5 8V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" />
+      </svg>
+    ),
+    children: [
+      { id: "career-dashboard", path: "/career", label: "Обзор" },
+      { id: "career-skills", path: "/career/skills", label: "Навыки" },
+      { id: "career-courses", path: "/career/courses", label: "Курсы" },
+      { id: "career-portfolio", path: "/career/portfolio", label: "Портфолио" },
+      { id: "career-timeline", path: "/career/portfolio/timeline", label: "Хронология" },
+      { id: "career-analytics", path: "/career/analytics", label: "Аналитика" },
+      { id: "career-interviews", path: "/career/interviews", label: "Собеседования" },
+      { id: "career-knowledge", path: "/career/knowledge", label: "База знаний" },
+      { id: "career-export", path: "/career/portfolio/export", label: "Экспорт резюме" },
+    ],
+  },
+  {
     id: "ai",
     path: "/ai",
     label: "AI и ML",
@@ -261,7 +284,7 @@ const NAV_MAP = NAV.reduce((acc, item) => {
 }, {});
 
 const NAV_GROUPS = [
-  { id: "overview", title: "Рабочая зона", items: ["home", "analytics", "ai", "docs", "posts"] },
+  { id: "overview", title: "Рабочая зона", items: ["home", "analytics", "ai", "career", "docs", "posts"] },
   { id: "operations", title: "Инфраструктура", items: ["plants", "vpn"] },
   { id: "finance", title: "Финансы", items: ["accounting"] },
   { id: "system", title: "Система", items: ["settings", "admin"] },

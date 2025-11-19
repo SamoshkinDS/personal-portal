@@ -97,9 +97,15 @@ router.get("/", async (req, res) => {
       `SELECT id, list_id, text, done, position, created_at, due_at
        FROM user_todos
        WHERE user_id = $1
-       ORDER BY list_id ASC, position ASC, created_at ASC`,
+    ORDER BY list_id ASC, position ASC, created_at ASC`,
       [userId]
     );
+    const now = new Date().toUTCString();
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("ETag", `${Date.now()}`);
+    res.setHeader("Last-Modified", now);
     return res.json({ lists, tasks: tasksRes.rows });
   } catch (e) {
     console.error("GET /todos", e);
