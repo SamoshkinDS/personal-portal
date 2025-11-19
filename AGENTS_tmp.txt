@@ -1,0 +1,196 @@
+AGENTS: Personal Portal
+
+Этот файл описывает, как Codex CLI должен работать с репозиторием Personal Portal (личный портал с задачами, аналитикой, AI‑инструментами, VPN и каталогом растений).
+Цель — помогать в разработке, не ломая существующую архитектуру, интеграции и рабочие процессы деплоя.
+Общее описание проекта
+
+Personal Portal — личный портал с домашним дашбордом, задачами, заметками, аналитикой, AI‑модулями, управлением VPN и каталогом растений/ухода.
+Архитектура: SPA на React 18 + Vite в корне репозитория (src/) и backend на Node.js + Express + PostgreSQL в backend/, общаются через REST‑API /api/*.
+Большая часть функционала и бизнес‑правил документирована в docs/*.md и GPT_specs/*.md; перед изменениями в конкретном модуле следует читать соответствующий документ.
+Технологический стек
+
+Фронтенд:
+React 18, Vite 7, React Router (src/router.jsx), Tailwind CSS (tailwind.config.js, darkMode: "class").
+Библиотеки: framer-motion (анимации), react-hot-toast (уведомления), react-hook-form, react-markdown + remark-gfm, recharts (графики), @tiptap/* (rich‑text редактор).
+Конфигурация через VITE_* переменные (VITE_API_BASE_URL, VITE_APP_NAME, VITE_VAPID_PUBLIC_KEY и т.п.).
+Бэкенд:
+Node.js (ESM, "type": "module"), Express (backend/index.js) с маршрутизацией по доменным роутерам в backend/routes/.
+PostgreSQL через pg (backend/db/connect.js), инициализация схем через ensure*Schema в backend/db/*Schema.js + отдельные миграции в backend/db/migrations/.
+Безопасность: JWT (jsonwebtoken), bcrypt для паролей, RBAC через таблицы permissions / user_permissions и middleware authRequired / requireRole / requirePermission.
+Дополнительно: node-cron (фоновые задачи), multer + sharp (загрузка и обработка изображений), undici/глобальный fetch для HTTP, uuid для идентификаторов.
+Данные и инфраструктура:
+PostgreSQL как основная БД; подключение и логгер SQL — backend/db/connect.js (опция DEBUG_SQL=1 для отладки запросов).
+Service Worker (public/sw.js) и push‑уведомления через web-push (backend/utils/push.js) и src/push/registerPush.js.
+Интеграции:
+Outline VPN Management API (backend/routes/vpn.js, env OUTLINE_API_URL, OUTLINE_CACHE_TTL_MS, OUTLINE_API_INSECURE).
+Xray / VLESS: gRPC‑клиент по proto/stats.proto (backend/services/xray.js), REST API в backend/routes/vless.js и backend/routes/xray.js.
+n8n: прокси‑роутер backend/routes/n8n.js на /api/n8n + UI src/pages/N8NIntegration.jsx, конфиг через N8N_API_BASE_URL/N8N_BASE_URL, N8N_API_KEY, N8N_APP_BASE_URL, N8N_WORKFLOWS_PATH, N8N_EXECUTIONS_PATH.
+S3: @aws-sdk/client-s3 + @aws-sdk/lib-storage в backend/services/s3Client.js, настройки через S3_* env.
+AI‑сервер / Promptmaster: webhook‑интеграция в backend/routes/promptmaster.js (env PROMPTMASTER_WEBHOOK_URL, PROMPTMASTER_WEBHOOK_TOKEN, PROMPTMASTER_RESPONSE_TOKEN) + UI src/pages/Promptmaster.jsx / src/api/promptmaster.js.
+Push‑уведомления: backend/utils/push.js + REST /api/notifications (backend/routes/notifications.js) и клиент src/push/registerPush.js.
+Структура папок
+
+Корень репозитория:
+src/ — фронтенд React SPA: страницы, компоненты, контексты, API‑клиенты, push‑логика.
+backend/ — Express‑бэкенд: REST‑роуты, работа с БД, интеграции, cron‑задачи.
+public/ — статические ресурсы фронтенда (включая sw.js).
+dist/ — собранный фронтенд билд Vite (не редактировать вручную).
+docs/ — документация по фичам (analytics, VPN, n8n, plants, Promptmaster, RBAC и др.).
+GPT_specs/ — техзадания и спец‑спеки для GPT/Codex для отдельных модулей (n8n, plants и т.д.).
+scripts/ — операционные скрипты (deploy.sh, update_frontend.sh, update_backend.sh, sync_xray_users.sh).
+images/ — статические изображения для UI/доков.
+.env, .env.development, .env.production — конфигурация Vite/клиента; backend использует свой backend/.env.
+sb_main.ts — импортированный код из Outline server (используется как референс, не участвует в сборке портала).
+src/ (фронтенд):
+pages/ — route‑уровневые страницы, сгруппированные по доменам:
+analytics/ (темы, статьи, очередь, интервью, тесты, настройки интеграций).
+accounting/ (финансы: счета, платежи, транзакции, доходы, категории, настройки).
+vpn/ (Outline/VLESS/VPN‑гайды и управление ключами).
+plants/, care/ (растения, вредители, болезни, лекарства, проблемы и их UI).
+admin/ (админ‑панель: пользователи, контент, логи).
+Корневые страницы: Home, AI, N8NIntegration, Promptmaster, Docs, Settings, Login, Register, NotFound, DebugDnd и др.
+components/ — переиспользуемые компоненты: PageShell, Sidebar, Header, модалки, карточки и др.
+context/ — контексты (в первую очередь AuthContext для авторизации).
+api/ — клиентские модули для REST‑API, построенные поверх apiAuthFetch (analytics.js, accounting.js, plants.js, promptmaster.js, integrationSettings.js и др.).
+hooks/ — кастомные хуки (например, для Outline/n8n и пр.).
+push/ — логика регистрации push‑подписки (registerPush.js).
+utils/ — утилиты (api.js — единая точка для формирования VITE_API_BASE_URL, добавления Bearer‑токена и т.д.).
+Корневые файлы: App.jsx, router.jsx, main.jsx, index.css.
+backend/ (бэкенд):
+index.js — основная точка входа: инициализация Express, применение middleware, подключение маршрутов, запуск cron‑задач, создание базовых таблиц/триггеров.
+routes/ — один файл на домен, маршруты /api/*: auth.js, admin.js, user.js, todos.js, todoLists.js, posts.js, vpn.js, vless.js, xray.js, notifications.js, actions.js, n8n.js, notes.js, accounting.js, plants.js, pests.js, diseases.js, medicines.js, problems.js, analytics.js, promptmaster.js, cheat.js, interview.js, tests.js, integrationSettings.js и др.
+controllers/ — контроллеры для auth (authController.js, authHandlers.js).
+middleware/ — middleware авторизации и RBAC (auth.js).
+db/ — подключение (connect.js), схемы по доменам (plantsSchema.js, careSchema.js, analyticsSchema.js, promptmasterSchema.js, cheatSchema.js, testsSchema.js, interviewSchema.js, settingsSchema.js) и SQL‑миграции db/migrations/*.sql.
+services/ — интеграции и фоновые задачи (s3Client.js, xray.js, accountingJobs.js, accountingUtils.js).
+utils/ — общие утилиты (slugify.js, imageUpload.js, push.js).
+scripts/ — вспомогательные скрипты (seedPlants.js и др.).
+proto/ — gRPC‑описания (например, stats.proto для Xray статистики).
+Как запускать dev/тесты/build
+
+Предварительные условия:
+Node.js 18+ и npm 9+ (для поддержки ESM и глобального fetch/Headers в backend).
+Локальный PostgreSQL; параметры подключения заданы в backend/.env (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD).
+Конфигурация фронтенда в .env.development (например, VITE_API_BASE_URL=http://localhost (line 8080), VITE_APP_NAME, VITE_VAPID_PUBLIC_KEY).
+Фронтенд (из корня репозитория):
+Установка зависимостей: npm install (или npm ci при CI/чистой установке).
+Dev‑режим: npm run dev (Vite‑сервер, по умолчанию http://localhost:5173, API ходит на VITE_API_BASE_URL).
+Build: npm run build (билд в dist/).
+Просмотр билда: npm run preview.
+Бэкенд (cd backend):
+Установка зависимостей: npm install (или npm ci).
+Dev‑режим: npm run dev (nodemon, порт из PORT в backend/.env, сейчас 8080; биндинг на 127.0.0.1).
+Продакшн‑запуск локально: npm start.
+Дополнительно: npm run seed:plants — заполняет базовые данные по растениям.
+Тесты:
+Явных test‑скриптов в package.json нет; автотесты пока не настроены.
+Проверка изменений обычно выполняется ручным прогоном основных сценариев в UI и/или HTTP‑запросами к /api/*.
+Если требуется добавить автотесты, нужно отдельно договориться о структуре (папки, инструменты) и не добавлять Jest/Vitest/Playwright без явного запроса.
+Код-стайл и архитектурные правила
+
+Общие принципы:
+Следовать текущей модульной структуре: один домен — один роутер/страница/модуль API, не смешивать разные области в одном файле.
+Не менять публичные API‑контракты (/api/* пути, формат JSON‑ответов и ошибок) без необходимости; при изменении синхронно обновлять фронтенд‑клиенты (src/api/*) и документацию в docs/.
+Использовать ESM (import/export) и современный JS (async/await, optional chaining); не добавлять CommonJS (require/module.exports).
+Сообщения об ошибках и тексты UI — в основном на русском; не переписывать существующие тексты без явной задачи.
+Фронтенд:
+Использовать функциональные компоненты и хуки; не добавлять классовые компоненты.
+Все роуты регистрируются в src/router.jsx; новые страницы:
+добавлять в router.jsx с обёрткой RouteTransition,
+при необходимости оборачивать в PermissionGate с корректной проверкой прав.
+Авторизация через AuthContext (src/context/AuthContext.jsx), токен хранится в localStorage под ключом token, пользователь — под auth.
+Для HTTP‑запросов использовать apiFetch/apiAuthFetch (src/utils/api.js) и выносить логику в модули src/api/*, а не делать fetch напрямую в компонентах.
+Стиль — Tailwind utility‑классы; изменения в tailwind.config.js минимальны и осознанны.
+Навигация/меню — через src/components/Sidebar.jsx; при добавлении нового раздела обновлять навигацию и учитывать права доступа.
+Бэкенд:
+В backend/index.js только высокоуровневая сборка приложения (подключение маршрутов, cron‑задачи, базовые ALTER TABLE); доменные SQL‑схемы внутри backend/db/*Schema.js.
+Для новых доменов:
+создать отдельный роутер в backend/routes/<domain>.js,
+при необходимости — модуль схемы backend/db/<domain>Schema.js с функцией ensure<Domain>Schema.
+Валидация данных и ошибок:
+возвращать JSON вида { message: string, ... },
+использовать осмысленные HTTP‑коды (400/401/403/404/409/422/500),
+логировать технические детали через console.error, но не выдавать стек‑трейсы наружу.
+Авторизация:
+для защищённых маршрутов использовать authRequired и при необходимости requireRole/requirePermission,
+новые права описывать в БД и в docs/RBAC_PERMISSIONS.md, а на фронте — в PermissionGate/buildPermissionState (в src/router.jsx).
+Интеграции выносить в сервисы (services/*, utils/*), а не дублировать логику в нескольких роутерах.
+Документация:
+Перед правками прочитать соответствующий файл в docs/ и, при наличии, в GPT_specs/ (например, PROMPTMASTER.md, n8n-integration.md, plants.md, OUTLINE_VPN_INTEGRATION.md, RBAC_PERMISSIONS.md).
+При нетривиальных изменениях (особенно по интеграциям и RBAC) обновлять документацию в соответствующем .md.
+Особенности интеграций (S3, n8n, AI-сервер и др.)
+
+S3 (каталог растений и изображения):
+Клиент S3 реализован в backend/services/s3Client.js; использовать функции uploadBuffer, deleteByKey, isS3Ready вместо прямой работы с SDK.
+Настройка через S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_FORCE_PATH_STYLE, S3_PUBLIC_BASE_URL.
+backend/routes/plants.js:
+загрузка изображений через multer (in‑memory) и sharp,
+лимиты: IMAGE_MAX_MB, IMAGE_PREVIEW_WIDTH, IMAGE_PREVIEW_QUALITY, PLANTS_PAGE_LIMIT,
+флаг s3Ready возвращается в /api/plants/meta.
+n8n:
+Прокси‑роутер backend/routes/n8n.js монтируется как /api/n8n, защищён authRequired + requirePermission(['view_ai']).
+Использует:
+N8N_API_BASE_URL/N8N_BASE_URL, N8N_API_KEY — базовый доступ,
+N8N_APP_BASE_URL — база для формирования ссылок в UI (если не задана — выводится из API URL),
+N8N_WORKFLOWS_PATH, N8N_EXECUTIONS_PATH — настраиваемые пути к ресурсам n8n с fallback на /workflows//executions и /rest/*.
+При отсутствии конфига (нет N8N_API_BASE_URL или N8N_API_KEY) роуты должны возвращать 503 и понятное сообщение, а не падать.
+UI‑страница src/pages/N8NIntegration.jsx опирается на ответы /api/n8n/workflows и /api/n8n/executions; любые изменения формата требуются синхронно обновлять.
+Растения используют n8n‑webhook для генерации описаний (n8n_generate_description_url в настройках растений: /api/plants/settings и обработка в backend/routes/plants.js).
+AI‑сервер / Promptmaster:
+Бэкенд backend/routes/promptmaster.js:
+хранит запросы в таблице prompt_requests (через ensurePromptmasterSchema),
+статусы запросов: draft, sent, processing, done, error,
+отправляет запросы на внешний AI‑сервис через dispatchToWebhook и PROMPTMASTER_WEBHOOK_URL/PROMPTMASTER_WEBHOOK_TOKEN,
+принимает ответы на /api/promptmaster/response с проверкой PROMPTMASTER_RESPONSE_TOKEN.
+Фронтенд src/pages/Promptmaster.jsx + src/api/promptmaster.js:
+работает с /api/promptmaster/requests, /categories, /articles, /settings,
+отображает очередь запросов, библиотеку статей/категорий и настройки вебхука.
+Важно не менять формат payload’ов для вебхука/ответов без приведения внешнего AI‑сервиса и UI.
+VPN / Outline / Xray:
+Outline (backend/routes/vpn.js):
+OUTLINE_API_URL — URL Management API (https://host:port/<token>),
+OUTLINE_CACHE_TTL_MS — TTL кэша для списка access‑keys,
+OUTLINE_API_INSECURE=true — разрешает нестрогий TLS (через undici.Agent).
+Роуты: /api/vpn/outline/keys (list/create/delete/rename).
+VLESS/Xray:
+gRPC‑клиент в backend/services/xray.js (имена метрик user>>>...>>>traffic>>>uplink/downlink, inbound>>>...),
+REST в backend/routes/vless.js (управление ключами, статистика, синхронизация) и backend/routes/xray.js,
+Xray также управляется через конфиг XRAY_API_HOST, XRAY_API_PORT, XRAY_API_EMAIL_FIELD, XRAY_CONFIG_PATH, XRAY_INBOUND_TAG и т.п.
+Cron‑задачи (node-cron) в backend/index.js используют Xray и accounting; наличие флагов XRAY_CRON_DISABLED, ACCOUNTING_JOBS_DISABLED.
+Push‑уведомления:
+Конфигурация VAPID‑ключей через WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY, WEB_PUSH_CONTACT в backend/.env; auto‑configure в backend/utils/push.js.
+Клиентская регистрация:
+src/push/registerPush.js регистрирует serviceWorker (/sw.js), запрашивает разрешение, подписывается и отправляет подписку на /api/notifications/subscribe.
+Если VITE_VAPID_PUBLIC_KEY не задан, ключ берётся из /api/notifications/public-key.
+Не менять формат push‑payloadов ({ title, body, url }) без пересмотра всех мест отправки/обработки.
+Как Codex должен вести себя
+
+Подход к задачам:
+Перед изменениями:
+определить, к какой области относится задача (frontend/backend/конкретный домен),
+прочитать профильные документы в docs/ и, при наличии, в GPT_specs/,
+сформулировать краткий план из нескольких шагов и действовать по нему.
+Делать изменения минимальными и локальными: не переименовывать существующие файлы, роуты, таблицы и env‑переменные без явного запроса.
+Соблюдать текущую структуру каталогов:
+новые страницы — в src/pages/<domain>/ + регистрация в src/router.jsx и навигации,
+новые API‑клиенты — в src/api/<domain>.js,
+новые бэкенд‑эндпоинты — в backend/routes/<domain>.js с логикой в соответствующем schema/service‑модуле.
+Безопасность и конфигурация:
+Не переписывать .env, backend/.env, deploy.sh и скрипты в scripts/ без прямого запроса; считать их «источником правды» по окружению и деплою.
+Не копировать реальные секреты (API‑ключи, токены, пары ACCESS_KEY/SECRET_KEY) в код, комментарии или документацию; оперировать только названиями переменных.
+Согласованность фронтенда и бэкенда:
+Любое изменение API или формата данных сопровождается:
+обновлением соответствующих модулей в src/api/*,
+обновлением использующих их страниц/компонентов,
+при необходимости — обновлением docs/*.md и GPT_specs/*.
+Для новых прав/ролей:
+добавить их в БД и описать в docs/RBAC_PERMISSIONS.md,
+использовать requirePermission/PermissionGate вместо жёстких проверок user.role в компонентах.
+Тестирование и проверка:
+После нетривиальных изменений:
+запускать фронтенд dev‑сервер и прогонять основной сценарий из соответствующего файла docs/*.md,
+проверять ключевые /api/* маршруты (в том числе ошибки и edge‑кейсы).
+Не добавлять новые инструменты (линтеры, форматтеры, тест‑фреймворки) и тяжёлые зависимости без явной необходимости и отдельного запроса.
+Стиль и коммуникация:
+Отвечать максимально по делу: указывать, какие файлы/модули затронуты и почему изменения сделаны именно так.
+Для сложных задач явно проговаривать принятый план, ограничения (интеграции, продакшен‑окружение) и возможные риски, прежде чем вносить большие изменения.
