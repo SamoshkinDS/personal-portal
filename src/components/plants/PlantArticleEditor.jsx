@@ -147,16 +147,18 @@ export default function PlantArticleEditor({
               value={markdownValue}
               onChange={(e) => setMarkdownValue(e.target.value)}
               className="min-h-[280px] rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm outline-none focus:border-blue-400 dark:border-white/10 dark:bg-slate-900/40"
-              placeholder="## Заголовок\n\n- Элемент списка"
+              placeholder="## ���������\n\n- ������� ������"
             />
             <div className="min-h-[280px] rounded-2xl border border-slate-100 bg-white/80 p-4 text-sm dark:border-white/10 dark:bg-slate-900/40">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose max-w-none dark:prose-invert">
-                {markdownValue || "*Здесь появится предпросмотр...*"}
-              </ReactMarkdown>
+              <div className="prose max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {markdownValue || "*����� �������� ������������...*"}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
         )}
-
+        
         <div className="flex justify-end gap-3">
           <button
             type="button"

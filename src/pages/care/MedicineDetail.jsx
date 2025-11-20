@@ -6,7 +6,7 @@ import PageShell from "../../components/PageShell.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { medicinesApi } from "../../api/care.js";
 import MedicineFormModal from "./components/MedicineFormModal.jsx";
-import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
+import PlantArticleEditorLazy, { loadPlantArticleExtensions } from "../../components/plants/PlantArticleEditorLazy.jsx";
 import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 import CareCoverCard from "./components/CareCoverCard.jsx";
 
@@ -27,10 +27,16 @@ export default function MedicineDetail() {
   const [articleOpen, setArticleOpen] = React.useState(false);
   const [articleSaving, setArticleSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [articleExtensions, setArticleExtensions] = React.useState(null);
   const [photoUploading, setPhotoUploading] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
+    loadPlantArticleExtensions()
+      .then((ext) => {
+        if (!cancelled) setArticleExtensions(ext);
+      })
+      .catch(() => {});
     const load = async () => {
       setLoading(true);
       try {
@@ -115,13 +121,13 @@ export default function MedicineDetail() {
   };
 
   const articleHtml = React.useMemo(() => {
-    if (!medicine?.instruction) return "";
+    if (!medicine?.instruction || !articleExtensions) return "";
     try {
-      return generateHTML(medicine.instruction, getPlantArticleExtensions());
+      return generateHTML(medicine.instruction, articleExtensions);
     } catch {
       return "";
     }
-  }, [medicine]);
+  }, [medicine?.instruction, articleExtensions]);
 
   const shopLinks = React.useMemo(() => {
     if (!medicine?.shop_links) return [];
@@ -272,7 +278,7 @@ export default function MedicineDetail() {
             </section>
 
             <MedicineFormModal open={formOpen} onClose={() => setFormOpen(false)} initialValue={medicine} onSubmit={handleSave} loading={saving} />
-            <PlantArticleEditor
+            <PlantArticleEditorLazy
               open={articleOpen}
               onClose={() => setArticleOpen(false)}
               initialContent={medicine.instruction || EMPTY_DOC}

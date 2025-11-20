@@ -6,7 +6,7 @@ import PageShell from "../../components/PageShell.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { pestsApi } from "../../api/care.js";
 import PestFormModal from "./components/PestFormModal.jsx";
-import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
+import PlantArticleEditorLazy, { loadPlantArticleExtensions } from "../../components/plants/PlantArticleEditorLazy.jsx";
 import MedicinesSelectModal from "./components/MedicinesSelectModal.jsx";
 import CareCoverCard from "./components/CareCoverCard.jsx";
 import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
@@ -32,9 +32,15 @@ export default function PestDetail() {
   const [medicinesSaving, setMedicinesSaving] = React.useState(false);
   const [removingMedicineId, setRemovingMedicineId] = React.useState(null);
   const [photoUploading, setPhotoUploading] = React.useState(false);
+  const [articleExtensions, setArticleExtensions] = React.useState(null);
 
   React.useEffect(() => {
     let cancelled = false;
+    loadPlantArticleExtensions()
+      .then((ext) => {
+        if (!cancelled) setArticleExtensions(ext);
+      })
+      .catch(() => {});
     const load = async () => {
       setLoading(true);
       try {
@@ -119,13 +125,13 @@ export default function PestDetail() {
   };
 
   const articleHtml = React.useMemo(() => {
-    if (!pest?.fight_text) return "";
+    if (!pest?.fight_text || !articleExtensions) return "";
     try {
-      return generateHTML(pest.fight_text, getPlantArticleExtensions());
+      return generateHTML(pest.fight_text, articleExtensions);
     } catch {
       return "";
     }
-  }, [pest]);
+  }, [pest?.fight_text, articleExtensions]);
 
   const existingMedicineIds = React.useMemo(() => new Set((pest?.medicines || []).map((item) => item.id)), [pest]);
 
@@ -301,7 +307,7 @@ export default function PestDetail() {
             </section>
 
             <PestFormModal open={formOpen} onClose={() => setFormOpen(false)} initialValue={pest} onSubmit={handleSave} loading={saving} />
-            <PlantArticleEditor
+            <PlantArticleEditorLazy
               open={articleOpen}
               onClose={() => setArticleOpen(false)}
               initialContent={pest.fight_text || EMPTY_DOC}

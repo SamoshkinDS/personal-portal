@@ -1,6 +1,6 @@
 import React from "react";
 import Modal from "../../../components/Modal.jsx";
-import PlantArticleEditor from "../../../components/plants/PlantArticleEditor.jsx";
+import PlantArticleEditorLazy from "../../../components/plants/PlantArticleEditorLazy.jsx";
 
 const EMPTY_DOC = { type: "doc", content: [] };
 const DEFAULT_FORM = {
@@ -162,7 +162,7 @@ export default function PestFormModal({ open, onClose, initialValue, onSubmit, l
         </form>
       </Modal>
 
-      <PlantArticleEditor
+      <PlantArticleEditorLazy
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         initialContent={form.fight_text || EMPTY_DOC}

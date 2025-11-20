@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React, { Suspense } from "react";
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -12,64 +12,66 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { Toaster } from "react-hot-toast";
 
 import Sidebar from "./components/Sidebar.jsx";
-import Analytics from "./pages/Analytics.jsx";
-import TopicPage from "./pages/analytics/Topic.jsx";
-import ArticlePage from "./pages/analytics/Article.jsx";
-import ArticlesQueuePage from "./pages/analytics/Queue.jsx";
-import InterviewPreparation from "./pages/analytics/InterviewPreparation.jsx";
-import KnowledgeTestsPage from "./pages/analytics/KnowledgeTests.jsx";
-import TestDetail from "./pages/analytics/TestDetail.jsx";
-import IntegrationSettings from "./pages/analytics/IntegrationSettings.jsx";
-import CheatSheets from "./pages/analytics/CheatSheets.jsx";
-import AI from "./pages/AI.jsx";
-import N8NIntegration from "./pages/N8NIntegration.jsx";
-import Promptmaster from "./pages/Promptmaster.jsx";
-import Docs from "./pages/Docs.jsx";
-import Posts from "./pages/Posts.jsx";
-import Settings from "./pages/Settings.jsx";
-import AccountingDashboard from "./pages/accounting/Dashboard.jsx";
-import AccountingAccounts from "./pages/accounting/Accounts.jsx";
-import AccountingPayments from "./pages/accounting/Payments.jsx";
-import AccountingTransactions from "./pages/accounting/Transactions.jsx";
-import AccountingIncomes from "./pages/accounting/Incomes.jsx";
-import AccountingCategories from "./pages/accounting/Categories.jsx";
-import AccountingSettings from "./pages/accounting/Settings.jsx";
-import Login from "./pages/Login.jsx";
-import AdminHome from "./pages/admin/Index.jsx";
-import AdminContent from "./pages/admin/Content.jsx";
-import AdminLogs from "./pages/admin/Logs.jsx";
-import AdminUsers from "./pages/admin/Users.jsx";
-import NotFound from "./pages/NotFound.jsx";
-import Home from "./pages/Home.jsx";
-import Outline from "./pages/vpn/Outline.jsx";
-import Vless from "./pages/vpn/Vless.jsx";
-import VlessGuide from "./pages/vpn/VlessGuide.jsx";
-import RoutesGuide from "./pages/vpn/RoutesGuide.jsx";
-import VPNIndex from "./pages/vpn/Index.jsx";
-import OutlineGuide from "./pages/vpn/OutlineGuide.jsx";
-import DebugDnd from "./pages/DebugDnd.jsx";
-import PlantsList from "./pages/plants/PlantsList.jsx";
-import PlantDetail from "./pages/plants/PlantDetail.jsx";
-import PlantSettings from "./pages/plants/PlantSettings.jsx";
-import PestsList from "./pages/care/PestsList.jsx";
-import PestDetail from "./pages/care/PestDetail.jsx";
-import DiseasesList from "./pages/care/DiseasesList.jsx";
-import DiseaseDetail from "./pages/care/DiseaseDetail.jsx";
-import MedicinesList from "./pages/care/MedicinesList.jsx";
-import MedicineDetail from "./pages/care/MedicineDetail.jsx";
-import ProblemsOverview from "./pages/care/ProblemsOverview.jsx";
+import PageLoader from "./components/PageLoader.jsx";
 import { registerPush } from "./push/registerPush.js";
-import CareerDashboard from "./pages/career/Dashboard.tsx";
-import SkillsPage from "./pages/career/SkillsPage.tsx";
-import CoursesPage from "./pages/career/CoursesPage.tsx";
-import PortfolioPage from "./pages/career/PortfolioPage.tsx";
-import ProjectDetails from "./pages/career/ProjectDetails.tsx";
-import InterviewsPage from "./pages/career/InterviewsPage.tsx";
-import KnowledgePage from "./pages/career/KnowledgePage.tsx";
-import KnowledgeDetailsPage from "./pages/career/KnowledgeDetailsPage.tsx";
-import PortfolioExportPage from "./pages/career/PortfolioExportPage.tsx";
-import PortfolioTimelinePage from "./pages/career/PortfolioTimelinePage.tsx";
-import AnalyticsPage from "./pages/career/AnalyticsPage.tsx";
+
+const Analytics = React.lazy(() => import("./pages/Analytics.jsx"));
+const TopicPage = React.lazy(() => import("./pages/analytics/Topic.jsx"));
+const ArticlePage = React.lazy(() => import("./pages/analytics/Article.jsx"));
+const ArticlesQueuePage = React.lazy(() => import("./pages/analytics/Queue.jsx"));
+const InterviewPreparation = React.lazy(() => import("./pages/analytics/InterviewPreparation.jsx"));
+const KnowledgeTestsPage = React.lazy(() => import("./pages/analytics/KnowledgeTests.jsx"));
+const TestDetail = React.lazy(() => import("./pages/analytics/TestDetail.jsx"));
+const IntegrationSettings = React.lazy(() => import("./pages/analytics/IntegrationSettings.jsx"));
+const CheatSheets = React.lazy(() => import("./pages/analytics/CheatSheets.jsx"));
+const AI = React.lazy(() => import("./pages/AI.jsx"));
+const N8NIntegration = React.lazy(() => import("./pages/N8NIntegration.jsx"));
+const Promptmaster = React.lazy(() => import("./pages/Promptmaster.jsx"));
+const Docs = React.lazy(() => import("./pages/Docs.jsx"));
+const Posts = React.lazy(() => import("./pages/Posts.jsx"));
+const Settings = React.lazy(() => import("./pages/Settings.jsx"));
+const AccountingDashboard = React.lazy(() => import("./pages/accounting/Dashboard.jsx"));
+const AccountingAccounts = React.lazy(() => import("./pages/accounting/Accounts.jsx"));
+const AccountingPayments = React.lazy(() => import("./pages/accounting/Payments.jsx"));
+const AccountingTransactions = React.lazy(() => import("./pages/accounting/Transactions.jsx"));
+const AccountingIncomes = React.lazy(() => import("./pages/accounting/Incomes.jsx"));
+const AccountingCategories = React.lazy(() => import("./pages/accounting/Categories.jsx"));
+const AccountingSettings = React.lazy(() => import("./pages/accounting/Settings.jsx"));
+const Login = React.lazy(() => import("./pages/Login.jsx"));
+const AdminHome = React.lazy(() => import("./pages/admin/Index.jsx"));
+const AdminContent = React.lazy(() => import("./pages/admin/Content.jsx"));
+const AdminLogs = React.lazy(() => import("./pages/admin/Logs.jsx"));
+const AdminUsers = React.lazy(() => import("./pages/admin/Users.jsx"));
+const NotFound = React.lazy(() => import("./pages/NotFound.jsx"));
+const Home = React.lazy(() => import("./pages/Home.jsx"));
+const Outline = React.lazy(() => import("./pages/vpn/Outline.jsx"));
+const Vless = React.lazy(() => import("./pages/vpn/Vless.jsx"));
+const VlessGuide = React.lazy(() => import("./pages/vpn/VlessGuide.jsx"));
+const RoutesGuide = React.lazy(() => import("./pages/vpn/RoutesGuide.jsx"));
+const VPNIndex = React.lazy(() => import("./pages/vpn/Index.jsx"));
+const OutlineGuide = React.lazy(() => import("./pages/vpn/OutlineGuide.jsx"));
+const DebugDnd = React.lazy(() => import("./pages/DebugDnd.jsx"));
+const PlantsList = React.lazy(() => import("./pages/plants/PlantsList.jsx"));
+const PlantDetail = React.lazy(() => import("./pages/plants/PlantDetail.jsx"));
+const PlantSettings = React.lazy(() => import("./pages/plants/PlantSettings.jsx"));
+const PestsList = React.lazy(() => import("./pages/care/PestsList.jsx"));
+const PestDetail = React.lazy(() => import("./pages/care/PestDetail.jsx"));
+const DiseasesList = React.lazy(() => import("./pages/care/DiseasesList.jsx"));
+const DiseaseDetail = React.lazy(() => import("./pages/care/DiseaseDetail.jsx"));
+const MedicinesList = React.lazy(() => import("./pages/care/MedicinesList.jsx"));
+const MedicineDetail = React.lazy(() => import("./pages/care/MedicineDetail.jsx"));
+const ProblemsOverview = React.lazy(() => import("./pages/care/ProblemsOverview.jsx"));
+const CareerDashboard = React.lazy(() => import("./pages/career/Dashboard.tsx"));
+const SkillsPage = React.lazy(() => import("./pages/career/SkillsPage.tsx"));
+const CoursesPage = React.lazy(() => import("./pages/career/CoursesPage.tsx"));
+const PortfolioPage = React.lazy(() => import("./pages/career/PortfolioPage.tsx"));
+const ProjectDetails = React.lazy(() => import("./pages/career/ProjectDetails.tsx"));
+const InterviewsPage = React.lazy(() => import("./pages/career/InterviewsPage.tsx"));
+const KnowledgePage = React.lazy(() => import("./pages/career/KnowledgePage.tsx"));
+const KnowledgeDetailsPage = React.lazy(() => import("./pages/career/KnowledgeDetailsPage.tsx"));
+const PortfolioExportPage = React.lazy(() => import("./pages/career/PortfolioExportPage.tsx"));
+const PortfolioTimelinePage = React.lazy(() => import("./pages/career/PortfolioTimelinePage.tsx"));
+const AnalyticsPage = React.lazy(() => import("./pages/career/AnalyticsPage.tsx"));
 
 function RouteTransition({ children }) {
   const location = useLocation();
@@ -91,7 +93,7 @@ function RouteTransition({ children }) {
       transition={{ duration: 0.3, ease: "easeOut" }}
       {...motionProps}
     >
-      {children}
+      <Suspense fallback={<PageLoader />}>{children}</Suspense>
     </motion.div>
   );
 }

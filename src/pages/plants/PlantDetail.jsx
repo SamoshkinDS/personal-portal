@@ -8,7 +8,7 @@ import PageShell from "../../components/PageShell.jsx";
 import Modal from "../../components/Modal.jsx";
 import { plantsApi } from "../../api/plants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
-import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
+import PlantArticleEditorLazy, { loadPlantArticleExtensions } from "../../components/plants/PlantArticleEditorLazy.jsx";
 import PlantProblemsSection from "../../components/plants/PlantProblemsSection.jsx";
 import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 
@@ -33,6 +33,7 @@ export default function PlantDetail() {
 
   const [meta, setMeta] = React.useState(null);
   const [metaLoading, setMetaLoading] = React.useState(true);
+  const [articleExtensions, setArticleExtensions] = React.useState(null);
 
   const [uploadingMain, setUploadingMain] = React.useState(false);
   const [uploadingGallery, setUploadingGallery] = React.useState(false);
@@ -65,6 +66,11 @@ export default function PlantDetail() {
 
   React.useEffect(() => {
     let mounted = true;
+    loadPlantArticleExtensions()
+      .then((ext) => {
+        if (mounted) setArticleExtensions(ext);
+      })
+      .catch(() => {});
     const loadMeta = async () => {
       try {
         const data = await plantsApi.meta();
@@ -237,14 +243,14 @@ export default function PlantDetail() {
   };
 
   const articleHtml = React.useMemo(() => {
-    if (!article?.content_rich) return "";
+    if (!article?.content_rich || !articleExtensions) return "";
     try {
-      const html = generateHTML(article.content_rich, getPlantArticleExtensions());
+      const html = generateHTML(article.content_rich, articleExtensions);
       return transformContent(html);
     } catch {
       return article.content_text || "";
     }
-  }, [article]);
+  }, [article?.content_rich, article?.content_text, articleExtensions]);
   const articleMarkdown = React.useMemo(() => (article?.content_text || "").trim(), [article]);
 
   return (
@@ -319,7 +325,7 @@ export default function PlantDetail() {
               onSave={handlePlantUpdate}
             />
 
-            <PlantArticleEditor
+            <PlantArticleEditorLazy
               open={articleEditorOpen}
               initialContent={article?.content_rich || EMPTY_DOC}
               initialMarkdown={article?.content_text || ""}

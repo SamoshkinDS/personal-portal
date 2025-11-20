@@ -6,7 +6,7 @@ import PageShell from "../../components/PageShell.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { diseasesApi } from "../../api/care.js";
 import DiseaseFormModal from "./components/DiseaseFormModal.jsx";
-import PlantArticleEditor, { getPlantArticleExtensions } from "../../components/plants/PlantArticleEditor.jsx";
+import PlantArticleEditorLazy, { loadPlantArticleExtensions } from "../../components/plants/PlantArticleEditorLazy.jsx";
 import MedicinesSelectModal from "./components/MedicinesSelectModal.jsx";
 import PlantsBreadcrumbs from "../../components/plants/PlantsBreadcrumbs.jsx";
 import CareCoverCard from "./components/CareCoverCard.jsx";
@@ -32,9 +32,15 @@ export default function DiseaseDetail() {
   const [medicineModalOpen, setMedicineModalOpen] = React.useState(false);
   const [medicinesSaving, setMedicinesSaving] = React.useState(false);
   const [removingMedicineId, setRemovingMedicineId] = React.useState(null);
+  const [articleExtensions, setArticleExtensions] = React.useState(null);
 
   React.useEffect(() => {
     let cancelled = false;
+    loadPlantArticleExtensions()
+      .then((ext) => {
+        if (!cancelled) setArticleExtensions(ext);
+      })
+      .catch(() => {});
     const load = async () => {
       setLoading(true);
       try {
@@ -119,13 +125,13 @@ export default function DiseaseDetail() {
   };
 
   const articleHtml = React.useMemo(() => {
-    if (!disease?.treatment_text) return "";
+    if (!disease?.treatment_text || !articleExtensions) return "";
     try {
-      return generateHTML(disease.treatment_text, getPlantArticleExtensions());
+      return generateHTML(disease.treatment_text, articleExtensions);
     } catch {
       return "";
     }
-  }, [disease]);
+  }, [disease?.treatment_text, articleExtensions]);
 
   const existingMedicineIds = React.useMemo(() => new Set((disease?.medicines || []).map((item) => item.id)), [disease]);
 
@@ -303,7 +309,7 @@ export default function DiseaseDetail() {
             </section>
 
             <DiseaseFormModal open={formOpen} onClose={() => setFormOpen(false)} initialValue={disease} onSubmit={handleSave} loading={saving} />
-            <PlantArticleEditor
+            <PlantArticleEditorLazy
               open={articleOpen}
               onClose={() => setArticleOpen(false)}
               initialContent={disease.treatment_text || EMPTY_DOC}

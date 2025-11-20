@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageShell from "../components/PageShell.jsx";
 import TaskBoard from "../components/TaskBoard.jsx";
+import ErrorBoundary from "../components/ErrorBoundary.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const quickLinks = [
@@ -268,7 +269,13 @@ function Home() {
       </section>
 
       <section className="rounded-3xl border border-slate-200/60 bg-white/90 p-6 shadow-sm transition-colors duration-500 dark:border-slate-700/60 dark:bg-slate-900/80">
-        <TaskBoard />
+        <ErrorBoundary fallback={() => (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-500/10 dark:text-rose-100">
+            ������ � �ண��� �����. ���������� �������� ���������� ���� ��� ���������, ���� ������ �� �ண��� � �����.
+          </div>
+        )}>
+          <TaskBoard />
+        </ErrorBoundary>
       </section>
     </PageShell>
   );

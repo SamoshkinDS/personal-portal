@@ -1,10 +1,12 @@
 // encoding: utf-8
-import React from "react";
+import React, { Suspense } from "react";
 import toast from "react-hot-toast";
 import Modal from "../Modal.jsx";
 import { apiAuthFetch } from "../../utils/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
-import NotesEditorModal from "./NotesEditorModal.jsx";
+import PageLoader from "../PageLoader.jsx";
+
+const NotesEditorModal = React.lazy(() => import("./NotesEditorModal.jsx"));
 
 const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"];
 const FILE_EXTENSIONS = ["pdf", "doc", "docx", "xls", "xlsx", "zip", "rar", "ppt", "pptx"];
@@ -383,13 +385,15 @@ export default function NotesBlock() {
         </div>
       )}
 
-      <NotesEditorModal
-        open={editorContext.open}
-        initialValue={editorContext.data}
-        onClose={closeEditor}
-        onSubmit={handleSave}
-        loading={saving}
-      />
+      <Suspense fallback={<PageLoader message="����� ��ࠡ���..." />}>
+        <NotesEditorModal
+          open={editorContext.open}
+          initialValue={editorContext.data}
+          onClose={closeEditor}
+          onSubmit={handleSave}
+          loading={saving}
+        />
+      </Suspense>
 
       <NoteViewerModal note={viewerNote} onClose={() => setViewerNote(null)} />
 

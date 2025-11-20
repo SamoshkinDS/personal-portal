@@ -1003,9 +1003,8 @@ router.delete("/accounts/:id", ...withEdit, async (req, res) => {
 router.get("/incomes", ...withView, async (req, res) => {
   try {
     const q = await pool.query(
-      `SELECT i.*, c.name AS category_name
+      `SELECT i.*, NULL::uuid AS income_category_id, NULL::text AS category_name
        FROM incomes i
-       LEFT JOIN categories c ON c.id = i.income_category_id
        WHERE i.user_id = $1
        ORDER BY i.next_date ASC`,
       [req.user.id]
@@ -1027,7 +1026,6 @@ router.post("/incomes", ...withEdit, async (req, res) => {
       "n_days",
       "next_date",
       "is_active",
-      "income_category_id",
     ]);
     const source = (payload.source_name || "").trim();
     if (!source) return res.status(400).json({ message: "source_name is required" });
@@ -1043,21 +1041,9 @@ router.post("/incomes", ...withEdit, async (req, res) => {
     if (!payload.next_date || !DATE_REGEXP.test(payload.next_date)) {
       return res.status(400).json({ message: "Invalid next_date" });
     }
-    let incomeCategoryId = null;
-    if (payload.income_category_id) {
-      if (!isValidUuid(payload.income_category_id)) {
-        return res.status(400).json({ message: "Invalid category" });
-      }
-      const category = await getCategory(req.user.id, payload.income_category_id);
-      if (!category) return res.status(400).json({ message: "Category not found" });
-      if (category.type !== "income") {
-        return res.status(400).json({ message: "Category must have income type" });
-      }
-      incomeCategoryId = category.id;
-    }
     const insert = await pool.query(
-      `INSERT INTO incomes (user_id, source_name, amount, currency, periodicity, n_days, next_date, is_active, income_category_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `INSERT INTO incomes (user_id, source_name, amount, currency, periodicity, n_days, next_date, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING *`,
       [
         req.user.id,
@@ -1068,7 +1054,6 @@ router.post("/incomes", ...withEdit, async (req, res) => {
         payload.n_days || null,
         payload.next_date,
         payload.is_active !== undefined ? parseBool(payload.is_active) : true,
-        incomeCategoryId,
       ]
     );
     res.status(201).json({ income: insert.rows[0] });
@@ -1089,7 +1074,6 @@ router.patch("/incomes/:id", ...withEdit, async (req, res) => {
       "n_days",
       "next_date",
       "is_active",
-      "income_category_id",
     ]);
     if (payload.next_date && !DATE_REGEXP.test(payload.next_date)) {
       return res.status(400).json({ message: "Invalid next_date" });
@@ -1102,20 +1086,6 @@ router.patch("/incomes/:id", ...withEdit, async (req, res) => {
     }
     if (payload.n_days !== undefined && !Number(payload.n_days)) {
       return res.status(400).json({ message: "n_days must be numeric" });
-    }
-    if (payload.income_category_id !== undefined) {
-      if (!payload.income_category_id) {
-        payload.income_category_id = null;
-      } else {
-        if (!isValidUuid(payload.income_category_id)) {
-          return res.status(400).json({ message: "Invalid category" });
-        }
-        const category = await getCategory(req.user.id, payload.income_category_id);
-        if (!category) return res.status(400).json({ message: "Category not found" });
-        if (category.type !== "income") {
-          return res.status(400).json({ message: "Category must have income type" });
-        }
-      }
     }
     const updates = [];
     const values = [];

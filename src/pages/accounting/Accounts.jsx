@@ -6,9 +6,9 @@ import PageShell from "../../components/PageShell.jsx";
 import { accountingApi } from "../../api/accounting.js";
 
 const ACCOUNT_TYPE_LABELS = {
-  card: "Дебетовая карта",
+  card: "Банковская карта",
   cash: "Наличные",
-  deposit: "Вклад",
+  deposit: "Депозит",
   other: "Другой счёт",
 };
 
@@ -73,7 +73,7 @@ export default function AccountsPage() {
   };
 
   const handleDelete = async (account) => {
-    if (!window.confirm(`Удалить счёт «${account.name}»?`)) return;
+    if (!window.confirm(`Удалить счёт <${account.name}>?`)) return;
     try {
       await accountingApi.deleteAccount(account.id);
       toast.success("Счёт удалён");
@@ -108,20 +108,27 @@ export default function AccountsPage() {
           <div className="space-y-3">
             {loading && (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-4 text-sm text-slate-400 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-500">
-                Загрузка счетов…
+                Загружаем счета...
               </div>
             )}
             {!loading && accounts.length === 0 && (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-4 text-sm text-slate-500 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-400">
-                Счета ещё не добавлены
+                Пока нет счетов
               </div>
             )}
             {accounts.map((account) => (
-              <button
+              <div
                 key={account.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelected(account)}
-                className={`w-full rounded-3xl border px-4 py-4 text-left transition ${
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelected(account);
+                  }
+                }}
+                className={`w-full cursor-pointer rounded-3xl border px-4 py-4 text-left transition ${
                   selected?.id === account.id
                     ? "border-indigo-400 bg-indigo-50/70 dark:border-indigo-300 dark:bg-indigo-500/10"
                     : "border-white/10 bg-white/90 hover:border-indigo-200 hover:bg-indigo-50/40 dark:border-white/5 dark:bg-slate-900/70"
@@ -133,7 +140,7 @@ export default function AccountsPage() {
                       {account.name}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      {ACCOUNT_TYPE_LABELS[account.type] || "Счёт"} · {account.currency}
+                      {ACCOUNT_TYPE_LABELS[account.type] || "Счёт"} • {account.currency}
                     </div>
                   </div>
                   <div className="text-right">
@@ -141,7 +148,7 @@ export default function AccountsPage() {
                       {formatMoney(account.actual_balance, account.currency)}
                     </div>
                     <div className="text-xs text-slate-400 dark:text-slate-500">
-                      Транзакций: {account.transactions_count}
+                      Операций: {account.transactions_count}
                     </div>
                   </div>
                 </div>
@@ -160,7 +167,7 @@ export default function AccountsPage() {
                     Удалить
                   </button>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
 
@@ -180,7 +187,7 @@ export default function AccountsPage() {
             </>
           ) : (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              Выберите счёт слева, чтобы изменить данные или установить баланс.
+              Выберите счёт слева, чтобы изменить данные или увидеть операции.
             </div>
           )}
         </div>
@@ -245,15 +252,15 @@ function AccountForm({ initial, onSubmit, mode = "create" }) {
       <Field label="Валюта">
         <input type="text" className="uppercase" {...register("currency")} />
       </Field>
-      <Field label={mode === "create" ? "Начальный баланс" : "Новый баланс (необязательно)"}>
+      <Field label={mode === "create" ? "Начальный баланс" : "Изменить баланс (опционально)"}>
         <input
           type="number"
           step="0.01"
-          placeholder={mode === "create" ? "0.00" : "Оставьте пустым, если не меняете баланс"}
+          placeholder={mode === "create" ? "0.00" : "Укажите сумму, если хотите обновить баланс"}
           {...register("balance")}
         />
       </Field>
-      <Field label="Заметка">
+      <Field label="Заметки">
         <textarea rows={3} {...register("notes")} />
       </Field>
       <button
@@ -261,7 +268,7 @@ function AccountForm({ initial, onSubmit, mode = "create" }) {
         disabled={isSubmitting}
         className="rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow hover:bg-indigo-500 disabled:opacity-60"
       >
-        {mode === "create" ? "Добавить" : "Сохранить"}
+        {mode === "create" ? "Создать" : "Сохранить"}
       </button>
     </form>
   );

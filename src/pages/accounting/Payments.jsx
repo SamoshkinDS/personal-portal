@@ -1,5 +1,5 @@
 // encoding: utf-8
-import React from "react";
+import React, { useDeferredValue, useMemo } from "react";
 import toast from "react-hot-toast";
 import PageShell from "../../components/PageShell.jsx";
 import PaymentsForm from "../../components/accounting/PaymentsForm.jsx";
@@ -21,29 +21,43 @@ export default function PaymentsPage() {
   const [typeFilter, setTypeFilter] = React.useState("");
   const [search, setSearch] = React.useState("");
   const [loading, setLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [history, setHistory] = React.useState({ payment: null, items: [] });
+  const deferredSearch = useDeferredValue(search);
 
   const load = React.useCallback(async () => {
+    let cancelled = false;
     try {
-      setLoading(true);
+      setRefreshing(true);
+      if (loading) setLoading(true);
       const response = await accountingApi.listPayments(
         typeFilter ? { type: typeFilter } : undefined
       );
-      setPayments(response.items || []);
+      if (!cancelled) setPayments(response.items || []);
     } catch (error) {
-      toast.error(error.message);
+      if (!cancelled) toast.error(error.message);
     } finally {
-      setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [typeFilter]);
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, typeFilter]);
 
   React.useEffect(() => {
-    load();
+    const cleanup = load();
+    return () => {
+      if (typeof cleanup === "function") cleanup();
+    };
   }, [load]);
 
-  const filtered = payments.filter((item) =>
-    item.title.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(
+    () => payments.filter((item) => item.title.toLowerCase().includes(deferredSearch.toLowerCase())),
+    [payments, deferredSearch]
   );
 
   const handleSubmit = async (payload) => {
