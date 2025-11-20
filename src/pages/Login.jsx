@@ -1,28 +1,56 @@
 // encoding: utf-8
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiFetch } from "../utils/api.js";
+import Logo from "../components/Logo.jsx";
+
+const MODES = {
+  login: {
+    title: "Вход",
+    subtitle: "Рады видеть вас снова",
+    cta: "Войти",
+    helper: "Нет аккаунта?",
+    helperAction: "Зарегистрироваться",
+  },
+  register: {
+    title: "Регистрация",
+    subtitle: "Создайте доступ к порталу",
+    cta: "Создать аккаунт",
+    helper: "Уже есть аккаунт?",
+    helperAction: "Войти",
+  },
+  reset: {
+    title: "Сброс пароля",
+    subtitle: "Обновите пароль в два шага",
+    cta: "Продолжить",
+    helper: "Вспомнили пароль?",
+    helperAction: "Войти",
+  },
+};
+
+const cardTransition = { duration: 0.25, ease: "easeOut" };
 
 export default function Login({ initialMode }) {
   const { login } = useAuth();
   const [search] = useSearchParams();
   const modeFromQuery = search.get("mode");
   const [mode, setMode] = useState(initialMode || modeFromQuery || "login");
+
   useEffect(() => {
     if (modeFromQuery && modeFromQuery !== mode) setMode(modeFromQuery);
   }, [modeFromQuery]);
 
-  // common
   const [error, setError] = useState("");
 
   // login form
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const submitLogin = async (e) => {
     e.preventDefault();
-    const ok = await login(loginForm.username, loginForm.password);
-    if (!ok) setError("Неверное имя пользователя или пароль.");
+    setError("");
+    const ok = await login(loginForm.username.trim(), loginForm.password);
+    if (!ok) setError("Неверные логин или пароль.");
   };
 
   // register form
@@ -37,7 +65,7 @@ export default function Login({ initialMode }) {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setError(data?.message || "Не удалось зарегистрироваться");
+      setError(data?.message || "Не удалось зарегистрировать пользователя.");
       return;
     }
     setMode("login");
@@ -55,15 +83,13 @@ export default function Login({ initialMode }) {
   const checkUsername = async (e) => {
     e.preventDefault();
     setError("");
-    if (!resetUsername) return setError("Введите имя пользователя");
-    const r = await apiFetch(
-      `/api/auth/exists?username=${encodeURIComponent(resetUsername)}`
-    );
+    if (!resetUsername.trim()) return setError("Введите имя пользователя.");
+    const r = await apiFetch(`/api/auth/exists?username=${encodeURIComponent(resetUsername.trim())}`);
     const data = await r.json().catch(() => ({}));
     if (r.ok && data?.exists) {
       setResetStep(2);
     } else {
-      setError("Пользователь не найден");
+      setError("Пользователь не найден.");
     }
   };
   const submitReset = async (e) => {
@@ -72,154 +98,225 @@ export default function Login({ initialMode }) {
     const r = await apiFetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: resetUsername, newPassword: resetPassword }),
+      body: JSON.stringify({ username: resetUsername.trim(), newPassword: resetPassword }),
     });
     if (!r.ok) {
       const data = await r.json().catch(() => ({}));
-      setError(data?.message || "Не удалось сбросить пароль");
+      setError(data?.message || "Не удалось обновить пароль.");
       return;
     }
     setMode("login");
   };
 
+  const current = MODES[mode];
+
+  const renderLogin = () => (
+    <motion.form
+      key="login"
+      onSubmit={submitLogin}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={cardTransition}
+      className="space-y-3"
+    >
+      <Input
+        label="Имя пользователя"
+        placeholder="username"
+        value={loginForm.username}
+        onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+      />
+      <Input
+        label="Пароль"
+        type="password"
+        placeholder="••••••••"
+        value={loginForm.password}
+        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+      />
+      <PrimaryButton text={current.cta} />
+    </motion.form>
+  );
+
+  const renderRegister = () => (
+    <motion.form
+      key="register"
+      onSubmit={submitRegister}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={cardTransition}
+      className="space-y-3"
+    >
+      <Input
+        label="Имя пользователя"
+        placeholder="username"
+        value={regForm.username}
+        onChange={(e) => setRegForm({ ...regForm, username: e.target.value })}
+      />
+      <Input
+        label="Пароль"
+        type="password"
+        placeholder="Надёжный пароль"
+        value={regForm.password}
+        onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
+      />
+      <PrimaryButton text={current.cta} />
+    </motion.form>
+  );
+
+  const renderReset = () => (
+    <motion.form
+      key="reset"
+      onSubmit={resetStep === 1 ? checkUsername : submitReset}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={cardTransition}
+      className="space-y-3"
+    >
+      <Input
+        label="Имя пользователя"
+        placeholder="username"
+        value={resetUsername}
+        onChange={(e) => setResetUsername(e.target.value)}
+      />
+      {resetStep === 2 && (
+        <Input
+          label="Новый пароль"
+          type="password"
+          placeholder="Новый пароль"
+          value={resetPassword}
+          onChange={(e) => setResetPassword(e.target.value)}
+        />
+      )}
+      <PrimaryButton text={resetStep === 1 ? "Продолжить" : "Обновить пароль"} />
+    </motion.form>
+  );
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 to-gray-700 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50 px-4 py-8 text-slate-900">
       <motion.div
-        className="w-full max-w-xs rounded-2xl border border-white/20 bg-white/10 p-8 text-gray-100 shadow-xl backdrop-blur-lg"
-        initial={{ opacity: 0, y: 40, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="relative w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200/70"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        {error && <p className="mb-3 text-center text-sm text-red-400">{error}</p>}
+        <div className="grid gap-0 md:grid-cols-[1fr,1.1fr]">
+          <div className="relative hidden md:block bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-400 p-10 text-white">
+            <div className="flex items-center gap-3">
+              <Logo showName size="md" className="text-white" />
+            </div>
+            <div className="mt-8 space-y-3">
+              <p className="text-lg font-semibold">Личный портал SAMOSHECHKIN</p>
+              <p className="text-sm text-white/80">
+                Управляйте задачами, аналитикой, VPN, растениями и AI‑инструментами из единой точки входа.
+              </p>
+              <div className="flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-3 text-sm font-medium backdrop-blur">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <path d="M4 6h16" />
+                  <path d="M4 12h10" />
+                  <path d="M4 18h7" />
+                </svg>
+                <span>Быстрый доступ к вашим сервисам</span>
+              </div>
+              <div className="flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-3 text-sm font-medium backdrop-blur">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <path d="M12 20v-6" />
+                  <path d="m6 12 6-8 6 8" />
+                  <path d="M4 20h16" />
+                </svg>
+                <span>Чистый интерфейс и быстрый вход</span>
+              </div>
+            </div>
+          </div>
 
-        <AnimatePresence mode="wait">
-          {mode === "login" && (
-            <motion.form
-              key="login"
-              onSubmit={submitLogin}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <h1 className="mb-4 text-center text-2xl font-bold text-white">Войти</h1>
-              <input
-                type="text"
-                placeholder="Имя пользователя"
-                value={loginForm.username}
-                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                className="mb-3 w-full rounded bg-gray-800 p-2 text-white outline-none ring-blue-400 transition focus:ring-2"
-              />
-              <input
-                type="password"
-                placeholder="Пароль"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                className="mb-3 w-full rounded bg-gray-800 p-2 text-white outline-none ring-blue-400 transition focus:ring-2"
-              />
-              <motion.button
-                type="submit"
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.03 }}
-                className="w-full rounded-lg bg-blue-600 py-2 font-semibold text-white transition-colors hover:bg-blue-700"
-              >
-                Войти
-              </motion.button>
-            </motion.form>
-          )}
+          <div className="relative bg-white px-6 py-8 md:px-10 md:py-12">
+            <div className="mb-6 flex items-center gap-3 md:hidden">
+              <Logo showName size="md" />
+            </div>
 
-          {mode === "register" && (
-            <motion.form
-              key="register"
-              onSubmit={submitRegister}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <h1 className="mb-4 text-center text-2xl font-bold text-white">Регистрация</h1>
-              <input
-                type="text"
-                placeholder="Имя пользователя"
-                value={regForm.username}
-                onChange={(e) => setRegForm({ ...regForm, username: e.target.value })}
-                className="mb-3 w-full rounded bg-gray-800 p-2 text-white outline-none ring-blue-400 transition focus:ring-2"
-              />
-              <input
-                type="password"
-                placeholder="Пароль"
-                value={regForm.password}
-                onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
-                className="mb-3 w-full rounded bg-gray-800 p-2 text-white outline-none ring-blue-400 transition focus:ring-2"
-              />
-              <motion.button
-                type="submit"
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.03 }}
-                className="w-full rounded-lg bg-green-600 py-2 font-semibold text-white transition-colors hover:bg-green-700"
-              >
-                Зарегистрироваться
-              </motion.button>
-            </motion.form>
-          )}
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h1 className="text-2xl font-bold">{current.title}</h1>
+                <p className="text-sm text-slate-500">{current.subtitle}</p>
+              </div>
+            </div>
 
-          {mode === "reset" && (
-            <motion.form
-              key="reset"
-              onSubmit={resetStep === 1 ? checkUsername : submitReset}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <h1 className="mb-4 text-center text-2xl font-bold text-white">Сброс пароля</h1>
-              <input
-                type="text"
-                placeholder="Имя пользователя"
-                value={resetUsername}
-                onChange={(e) => setResetUsername(e.target.value)}
-                className="mb-3 w-full rounded bg-gray-800 p-2 text-white outline-none ring-blue-400 transition focus:ring-2"
-              />
-              {resetStep === 2 && (
-                <input
-                  type="password"
-                  placeholder="Новый пароль"
-                  value={resetPassword}
-                  onChange={(e) => setResetPassword(e.target.value)}
-                  className="mb-3 w-full rounded bg-gray-800 p-2 text-white outline-none ring-blue-400 transition focus:ring-2"
-                />
+            <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-full bg-slate-100 p-1 text-sm font-semibold text-slate-500">
+              {Object.keys(MODES).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setMode(key)}
+                  className={`rounded-full px-3 py-1.5 transition ${
+                    mode === key ? "bg-white text-indigo-600 shadow ring-1 ring-indigo-100" : "hover:text-indigo-500"
+                  }`}
+                >
+                  {MODES[key].title}
+                </button>
+              ))}
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-6">
+              <AnimatePresence mode="wait">
+                {mode === "login" && renderLogin()}
+                {mode === "register" && renderRegister()}
+                {mode === "reset" && renderReset()}
+              </AnimatePresence>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              <span>{current.helper}</span>
+              {mode !== "login" && (
+                <button className="font-semibold text-indigo-600 hover:text-indigo-500" onClick={() => setMode("login")}>
+                  Войти
+                </button>
               )}
-              <motion.button
-                type="submit"
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.03 }}
-                className="w-full rounded-lg bg-indigo-600 py-2 font-semibold text-white transition-colors hover:bg-indigo-700"
-              >
-                {resetStep === 1 ? "Проверить пользователя" : "Сбросить пароль"}
-              </motion.button>
-            </motion.form>
-          )}
-        </AnimatePresence>
-
-        <div className="mt-4 space-y-1 text-center text-sm text-gray-200">
-          {mode !== "login" && (
-            <button className="text-blue-300 hover:underline" onClick={() => setMode("login")}>
-              Уже есть аккаунт? Войти
-            </button>
-          )}
-          {mode !== "register" && (
-            <button className="block w-full text-blue-300 hover:underline" onClick={() => setMode("register")}>
-              Нет аккаунта? Зарегистрироваться
-            </button>
-          )}
-          {mode !== "reset" && (
-            <button className="block w-full text-blue-300 hover:underline" onClick={() => setMode("reset")}>
-              Забыли пароль?
-            </button>
-          )}
+              {mode !== "register" && (
+                <button className="font-semibold text-indigo-600 hover:text-indigo-500" onClick={() => setMode("register")}>
+                  Зарегистрироваться
+                </button>
+              )}
+              {mode !== "reset" && (
+                <button className="font-semibold text-indigo-600 hover:text-indigo-500" onClick={() => setMode("reset")}>
+                  Сбросить пароль
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </motion.div>
     </div>
+  );
+}
+
+function Input({ label, ...props }) {
+  return (
+    <label className="block space-y-1 text-sm">
+      <span className="text-slate-600">{label}</span>
+      <input
+        {...props}
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm outline-none ring-indigo-200 transition focus:border-indigo-300 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
+      />
+    </label>
+  );
+}
+
+function PrimaryButton({ text }) {
+  return (
+    <motion.button
+      type="submit"
+      whileTap={{ scale: 0.97 }}
+      whileHover={{ scale: 1.01 }}
+      className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
+    >
+      {text}
+    </motion.button>
   );
 }
