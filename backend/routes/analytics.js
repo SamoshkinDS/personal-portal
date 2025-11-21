@@ -1,14 +1,15 @@
 import express from "express";
-import jwt from "jsonwebtoken";
 import { pool } from "../db/connect.js";
-import { authRequired } from "../middleware/auth.js";
+import { authRequired, requirePermission } from "../middleware/auth.js";
+import { verifyJwt } from "../lib/jwt.js";
 
 const analyticsRouter = express.Router();
 const articlesRouter = express.Router();
 const articlesQueueRouter = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 const VALID_STATUSES = new Set(["draft", "processing", "finished", "published"]);
+const analyticsGuard = [authRequired, requirePermission(["view_analytics"])];
+const QUEUE_TOKEN = (process.env.ARTICLES_QUEUE_TOKEN || "").trim();
 
 function normalizeTags(tags) {
   if (!Array.isArray(tags)) return [];
@@ -66,12 +67,28 @@ function attachUserFromAuth(req) {
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
   if (!token) return null;
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = verifyJwt(token);
     req.user = { id: decoded.sub, username: decoded.username };
     return req.user;
   } catch {
     return null;
   }
+}
+
+function queueAccessGuard(req, res, next) {
+  const providedToken = String(req.query.token || req.headers["x-queue-token"] || "").trim();
+  const statusParam = String(req.query.status || "").toLowerCase();
+  const allowProcessingFeed =
+    req.method === "GET" && statusParam === "processing" && QUEUE_TOKEN && providedToken === QUEUE_TOKEN;
+
+  if (allowProcessingFeed) {
+    return next();
+  }
+
+  return authRequired(req, res, (err) => {
+    if (err) return;
+    return requirePermission(["view_analytics"])(req, res, next);
+  });
 }
 
 async function breadcrumbsForTopic(topicId) {
@@ -90,7 +107,7 @@ async function breadcrumbsForTopic(topicId) {
   return items.reverse();
 }
 
-analyticsRouter.use(authRequired);
+analyticsRouter.use(...analyticsGuard);
 
 analyticsRouter.get("/topics", async (req, res) => {
   try {
@@ -348,6 +365,8 @@ analyticsRouter.delete("/articles/:id", async (req, res) => {
   }
 });
 
+articlesRouter.use(...analyticsGuard);
+
 articlesRouter.post("/", async (req, res) => {
   try {
     const { queue_id, title, content, tags = [], status, summary } = req.body || {};
@@ -376,6 +395,8 @@ articlesRouter.post("/", async (req, res) => {
     return res.status(500).json({ message: "Не удалось сохранить статью" });
   }
 });
+
+articlesQueueRouter.use(queueAccessGuard);
 
 articlesQueueRouter.get("/", async (req, res) => {
   try {

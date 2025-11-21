@@ -1,7 +1,8 @@
 import express from "express";
-import { authRequired, requireRole } from "../middleware/auth.js";
+import { authRequired } from "../middleware/auth.js";
 import { pool } from "../db/connect.js";
 import { Agent } from "undici";
+import { requirePermission } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -20,6 +21,8 @@ const cache = {
   keys: { data: null, at: 0 },
 };
 
+const vpnPermissionGuard = requirePermission(["view_vpn"]);
+
 function withinTtl(ts) {
   return Date.now() - ts < OUTLINE_CACHE_TTL_MS;
 }
@@ -36,8 +39,26 @@ async function outlineFetch(path, options = {}) {
   return res;
 }
 
-// All VPN routes require auth and VPN capability (role ALL or VPN or NON_ADMIN per app policy)
-router.use(authRequired, requireRole(["ALL", "VPN", "NON_ADMIN"]));
+async function ensureVpnAccess(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const userQ = await pool.query("SELECT role, vpn_can_create, is_blocked FROM users WHERE id = $1", [userId]);
+    if (!userQ.rows.length) return res.status(404).json({ message: "User not found" });
+    const { role, vpn_can_create: vpnCanCreate, is_blocked: isBlocked } = userQ.rows[0];
+    if (isBlocked) return res.status(403).json({ message: "User is blocked" });
+    if (role === "ALL" || role === "VPN" || vpnCanCreate) {
+      return next();
+    }
+    return vpnPermissionGuard(req, res, next);
+  } catch (error) {
+    console.error("[vpn] access check failed", error);
+    return res.status(500).json({ message: "Failed to verify permissions" });
+  }
+}
+
+// All VPN routes require auth and explicit permission/flag
+router.use(authRequired, ensureVpnAccess);
 
 // List access keys
 router.get("/outline/keys", async (req, res) => {

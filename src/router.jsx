@@ -38,6 +38,7 @@ const AccountingIncomes = React.lazy(() => import("./pages/accounting/Incomes.js
 const AccountingCategories = React.lazy(() => import("./pages/accounting/Categories.jsx"));
 const AccountingSettings = React.lazy(() => import("./pages/accounting/Settings.jsx"));
 const Login = React.lazy(() => import("./pages/Login.jsx"));
+const ResetPassword = React.lazy(() => import("./pages/ResetPassword.jsx"));
 const AdminHome = React.lazy(() => import("./pages/admin/Index.jsx"));
 const AdminContent = React.lazy(() => import("./pages/admin/Content.jsx"));
 const AdminLogs = React.lazy(() => import("./pages/admin/Logs.jsx"));
@@ -218,14 +219,6 @@ export const router = createBrowserRouter(
           element={
             <RouteTransition>
               <Login initialMode="register" />
-            </RouteTransition>
-          }
-        />
-        <Route
-          path="reset-password"
-          element={
-            <RouteTransition>
-              <Login initialMode="reset" />
             </RouteTransition>
           }
         />
@@ -621,6 +614,14 @@ export const router = createBrowserRouter(
           element={
             <RouteTransition>
               <Settings />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="reset-password"
+          element={
+            <RouteTransition>
+              <ResetPassword />
             </RouteTransition>
           }
         />

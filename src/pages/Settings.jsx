@@ -8,6 +8,7 @@ import { apiFetch } from "../utils/api.js";
 export default function Settings() {
   const { isDark, toggleTheme } = useTheme();
   const [profile, setProfile] = React.useState({ name: "", email: "", phone: "" });
+  const [passwordForm, setPasswordForm] = React.useState({ currentPassword: "", newPassword: "" });
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   React.useEffect(() => {
@@ -35,6 +36,23 @@ export default function Settings() {
       toast.success("Профиль сохранён");
     } catch {
       toast.error("Не удалось сохранить профиль");
+    }
+  };
+
+  const changePassword = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await apiFetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(passwordForm),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Не удалось обновить пароль");
+      toast.success("Пароль обновлён");
+      setPasswordForm({ currentPassword: "", newPassword: "" });
+    } catch (err) {
+      toast.error(err.message || "Не удалось обновить пароль");
     }
   };
 
@@ -84,13 +102,44 @@ export default function Settings() {
             >
               Сохранить профиль
             </button>
+          </div>
+        </form>
+      </section>
+      <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm transition-colors duration-500 dark:border-gray-700 dark:bg-slate-900">
+        <h2 className="text-xl font-semibold">Смена пароля</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Введите текущий пароль и новый, чтобы обновить доступ.</p>
+        <form onSubmit={changePassword} className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <label className="text-sm">
+            Текущий пароль
+            <input
+              className="mt-1 w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-400 dark:border-gray-600 dark:bg-slate-800 dark:text-gray-100"
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <label className="text-sm">
+            Новый пароль
+            <input
+              className="mt-1 w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-400 dark:border-gray-600 dark:bg-slate-800 dark:text-gray-100"
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+          </label>
+          <div className="md:col-span-2 flex items-center gap-3">
             <button
-              type="button"
-              className="rounded-2xl border border-gray-300 px-5 py-2 text-sm text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-slate-800"
-              onClick={() => toast("Смена пароля пока недоступна (заготовка)")}
+              type="submit"
+              className="rounded-2xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
             >
-              Сменить пароль
+              Обновить пароль
             </button>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Пароль хранится только в зашифрованном виде.</p>
           </div>
         </form>
       </section>

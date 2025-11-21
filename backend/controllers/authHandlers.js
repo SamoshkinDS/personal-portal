@@ -1,9 +1,6 @@
 import { pool } from "../db/connect.js";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+import { signJwt } from "../lib/jwt.js";
 
 export const register = async (req, res) => {
   try {
@@ -14,10 +11,10 @@ export const register = async (req, res) => {
 
     const loginTrimmed = String(username || "").trim();
     const passwordStr = String(password || "");
-    if (loginTrimmed.length < 3 || !/^[A-Za-z0-9]+$/.test(loginTrimmed)) {
+    if (loginTrimmed.length < 3 || loginTrimmed.length > 50 || !/^[A-Za-z0-9]+$/.test(loginTrimmed)) {
       return res.status(400).json({ message: "Логин должен содержать минимум 3 латинских символа или цифры" });
     }
-    if (passwordStr.length < 8 || !/^[A-Za-z0-9]+$/.test(passwordStr)) {
+    if (passwordStr.length < 8 || passwordStr.length > 120 || !/^[A-Za-z0-9]+$/.test(passwordStr)) {
       return res.status(400).json({ message: "Пароль должен быть не короче 8 символов, только латиница и цифры" });
     }
 
@@ -54,13 +51,18 @@ export const login = async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ message: "username and password are required" });
     }
+    const loginTrimmed = String(username || "").trim();
+    const passwordStr = String(password || "");
+    if (!loginTrimmed || loginTrimmed.length > 50 || passwordStr.length > 120) {
+      return res.status(400).json({ message: "Неверные логин или пароль" });
+    }
     const q = await pool.query(
       "SELECT id, username, password_hash, role, is_blocked, vpn_can_create FROM users WHERE username = $1",
-      [username]
+      [loginTrimmed]
     );
     if (q.rows.length === 0) {
       // check registration request statuses
-      const reqQ = await pool.query("SELECT status FROM registration_requests WHERE login = $1", [username]);
+      const reqQ = await pool.query("SELECT status FROM registration_requests WHERE login = $1", [loginTrimmed]);
       if (reqQ.rows.length) {
         const status = reqQ.rows[0].status;
         if (status === "pending") return res.status(403).json({ message: "Ваша заявка ещё не подтверждена." });
@@ -78,7 +80,7 @@ export const login = async (req, res) => {
     }
     await pool.query("UPDATE users SET last_login = NOW() WHERE id = $1", [user.id]);
     const payload = { sub: user.id, username: user.username };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const token = signJwt(payload);
     // Load permissions
     const permsQ = await pool.query("SELECT perm_key FROM user_permissions WHERE user_id = $1", [user.id]);
     const permissions = permsQ.rows.map(r => r.perm_key);
@@ -91,22 +93,26 @@ export const login = async (req, res) => {
 
 export const resetPassword = async (req, res) => {
   try {
-    const { username, newPassword } = req.body || {};
-    if (!username || !newPassword) {
-      return res.status(400).json({ message: "username and newPassword are required" });
+    const userId = req.user?.id;
+    const { currentPassword, newPassword } = req.body || {};
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "currentPassword and newPassword are required" });
     }
-    const q = await pool.query(
-      "SELECT id FROM users WHERE username = $1",
-      [username]
-    );
+    const q = await pool.query("SELECT id, password_hash FROM users WHERE id = $1", [userId]);
     if (q.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
-    const hash = await bcrypt.hash(newPassword, 10);
-    await pool.query(
-      "UPDATE users SET password_hash = $1 WHERE username = $2",
-      [hash, username]
-    );
+    const passwordStr = String(newPassword || "");
+    if (passwordStr.length < 8 || passwordStr.length > 120 || !/^[A-Za-z0-9]+$/.test(passwordStr)) {
+      return res.status(400).json({ message: "Пароль должен быть не короче 8 символов, только латиница и цифры" });
+    }
+    const currentOk = await bcrypt.compare(String(currentPassword || ""), q.rows[0].password_hash);
+    if (!currentOk) {
+      return res.status(401).json({ message: "Текущий пароль не совпадает" });
+    }
+    const hash = await bcrypt.hash(passwordStr, 10);
+    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, userId]);
     return res.json({ message: "Password reset successfully" });
   } catch (error) {
     console.error("resetPassword error", error);
@@ -116,18 +122,11 @@ export const resetPassword = async (req, res) => {
 
 export const me = async (req, res) => {
   try {
-    const auth = req.headers["authorization"] || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-    if (!token) return res.status(401).json({ message: "No token provided" });
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (e) {
-      return res.status(401).json({ message: "Invalid token" });
-    }
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "No token provided" });
     const userQ = await pool.query(
       "SELECT id, username, created_at, role, is_blocked, vpn_can_create FROM users WHERE id = $1",
-      [decoded.sub]
+      [userId]
     );
     if (userQ.rows.length === 0) return res.status(404).json({ message: "User not found" });
     const u = userQ.rows[0];

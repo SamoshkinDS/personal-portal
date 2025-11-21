@@ -1,6 +1,6 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import { authRequired, requireRole, requirePermission } from "../middleware/auth.js";
+import { authRequired, requirePermission } from "../middleware/auth.js";
 import { pool } from "../db/connect.js";
 import {
   getStatsByUUID,
@@ -15,6 +15,7 @@ const router = express.Router();
 const VLESS_DOMAIN = process.env.VLESS_DOMAIN || "";
 const VLESS_PORT = process.env.VLESS_PORT || "";
 const VLESS_TEMPLATE = process.env.VLESS_TEMPLATE || "";
+const vpnPermissionGuard = requirePermission(["view_vpn"]);
 
 function buildConfigUrl(uuid) {
   if (VLESS_TEMPLATE) {
@@ -53,7 +54,25 @@ async function hydrateKey(row) {
   };
 }
 
-router.use(authRequired, requireRole(["ALL", "VPN", "NON_ADMIN"]));
+async function ensureVpnAccess(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const userQ = await pool.query("SELECT role, vpn_can_create, is_blocked FROM users WHERE id = $1", [userId]);
+    if (!userQ.rows.length) return res.status(404).json({ message: "User not found" });
+    const { role, vpn_can_create: vpnCanCreate, is_blocked: isBlocked } = userQ.rows[0];
+    if (isBlocked) return res.status(403).json({ message: "User is blocked" });
+    if (role === "ALL" || role === "VPN" || vpnCanCreate) {
+      return next();
+    }
+    return vpnPermissionGuard(req, res, next);
+  } catch (error) {
+    console.error("[vless] access check failed", error);
+    return res.status(500).json({ message: "Failed to verify permissions" });
+  }
+}
+
+router.use(authRequired, ensureVpnAccess);
 
 router.get("/keys", async (req, res) => {
   try {

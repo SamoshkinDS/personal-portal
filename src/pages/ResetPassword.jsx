@@ -3,29 +3,29 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { apiFetch } from "../utils/api.js";
+import { apiAuthFetch } from "../utils/api.js";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: "", newPassword: "" });
+  const [form, setForm] = useState({ currentPassword: "", newPassword: "" });
   const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     try {
-      const res = await apiFetch("/api/auth/reset-password", {
+      const res = await apiAuthFetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data?.message || "Не удалось сбросить пароль");
+        setError(data?.message || "Не удалось обновить пароль");
         return;
       }
-      toast.success("Пароль обновлён. Выполните вход.");
-      navigate("/login", { replace: true });
+      toast.success("Пароль обновлён.");
+      navigate("/settings", { replace: true });
     } catch (err) {
       console.error(err);
       setError("Ошибка запроса");
@@ -42,13 +42,14 @@ export default function ResetPassword() {
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
       >
-        <h1 className="mb-6 text-2xl font-bold text-white">Сброс пароля</h1>
+        <h1 className="mb-6 text-2xl font-bold text-white">Смена пароля</h1>
         <input
-          type="text"
-          placeholder="Имя пользователя"
-          value={form.username}
-          onChange={(e) => setForm({ ...form, username: e.target.value })}
+          type="password"
+          placeholder="Текущий пароль"
+          value={form.currentPassword}
+          onChange={(e) => setForm({ ...form, currentPassword: e.target.value })}
           className="mb-3 w-full rounded bg-gray-800 p-2 text-white outline-none ring-blue-400 transition focus:ring-2"
+          autoComplete="current-password"
         />
         <input
           type="password"
@@ -56,6 +57,7 @@ export default function ResetPassword() {
           value={form.newPassword}
           onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
           className="mb-2 w-full rounded bg-gray-800 p-2 text-white outline-none ring-blue-400 transition focus:ring-2"
+          autoComplete="new-password"
         />
         {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
         <motion.button
@@ -64,12 +66,12 @@ export default function ResetPassword() {
           whileHover={{ scale: 1.03 }}
           className="w-full rounded-lg bg-indigo-600 py-2 font-semibold text-white transition-colors hover:bg-indigo-700"
         >
-          Сбросить пароль
+          Обновить пароль
         </motion.button>
         <div className="mt-4 text-sm text-gray-200">
-          Вспомнили пароль?{" "}
-          <Link to="/login" className="text-blue-300 hover:underline">
-            Войти
+          Хотите вернуться?{" "}
+          <Link to="/settings" className="text-blue-300 hover:underline">
+            Настройки
           </Link>
         </div>
       </motion.form>

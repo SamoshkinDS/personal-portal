@@ -29,13 +29,16 @@ export default function Login({ initialMode }) {
   const { login } = useAuth();
   const [search] = useSearchParams();
   const modeFromQuery = search.get("mode");
-  const [mode, setMode] = useState(initialMode || modeFromQuery || "login");
+  const allowedModes = ["login", "register"];
+  const initialModeSafe = allowedModes.includes(initialMode) ? initialMode : null;
+  const queryModeSafe = allowedModes.includes(modeFromQuery) ? modeFromQuery : null;
+  const [mode, setMode] = useState(initialModeSafe || queryModeSafe || "login");
 
   useEffect(() => {
-    if (modeFromQuery && modeFromQuery !== mode && (modeFromQuery === "login" || modeFromQuery === "register")) {
-      setMode(modeFromQuery);
+    if (queryModeSafe && queryModeSafe !== mode) {
+      setMode(queryModeSafe);
     }
-  }, [modeFromQuery]);
+  }, [queryModeSafe, mode]);
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -71,55 +74,7 @@ export default function Login({ initialMode }) {
     setMode("login");
   };
 
-  // reset form (2-step)
-  const [resetStep, setResetStep] = useState(1);
-  const [resetUsername, setResetUsername] = useState("");
-  const [resetPassword, setResetPassword] = useState("");
-  useEffect(() => {
-    if (mode !== "reset") return;
-    setResetStep(1);
-    setResetPassword("");
-  }, [mode]);
-  const checkUsername = async (e) => {
-    e.preventDefault();
-    setError("");
-    setNotice("");
-    if (!resetUsername.trim()) return setError("Введите имя пользователя.");
-    const r = await apiFetch(`/api/auth/exists?username=${encodeURIComponent(resetUsername.trim())}`);
-    const data = await r.json().catch(() => ({}));
-    if (r.ok && data?.exists) {
-      setResetStep(2);
-    } else {
-      setError("Пользователь не найден.");
-    }
-  };
-  const submitReset = async (e) => {
-    e.preventDefault();
-    setError("");
-    setNotice("");
-    const r = await apiFetch("/api/auth/reset-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: resetUsername.trim(), newPassword: resetPassword }),
-    });
-    if (!r.ok) {
-      const data = await r.json().catch(() => ({}));
-      setError(data?.message || "Не удалось обновить пароль.");
-      return;
-    }
-    setMode("login");
-  };
-
-  const current =
-    mode === "reset"
-      ? {
-          title: "Сброс пароля",
-          subtitle: "Обновите пароль в два шага",
-          helper: "Вспомнили пароль?",
-          helperAction: "Войти",
-          cta: "Продолжить",
-        }
-      : MODES[mode] || MODES.login;
+  const current = MODES[mode] || MODES.login;
 
   const renderLogin = () => (
     <motion.form
@@ -172,35 +127,6 @@ export default function Login({ initialMode }) {
         onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
       />
       <PrimaryButton text={current.cta} />
-    </motion.form>
-  );
-
-  const renderReset = () => (
-    <motion.form
-      key="reset"
-      onSubmit={resetStep === 1 ? checkUsername : submitReset}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={cardTransition}
-      className="space-y-3"
-    >
-      <Input
-        label="Имя пользователя"
-        placeholder="username"
-        value={resetUsername}
-        onChange={(e) => setResetUsername(e.target.value)}
-      />
-      <Input
-        label="Новый пароль"
-        type="password"
-        placeholder="Новый пароль"
-        value={resetPassword}
-        onChange={(e) => setResetPassword(e.target.value)}
-        disabled={resetStep === 1}
-        helper={resetStep === 1 ? "Доступно после проверки пользователя" : ""}
-      />
-      <PrimaryButton text={resetStep === 1 ? "Продолжить" : "Обновить пароль"} />
     </motion.form>
   );
 
@@ -283,7 +209,6 @@ export default function Login({ initialMode }) {
               <AnimatePresence mode="wait">
                 {mode === "login" && renderLogin()}
                 {mode === "register" && renderRegister()}
-                {mode === "reset" && renderReset()}
               </AnimatePresence>
             </div>
 
@@ -299,12 +224,10 @@ export default function Login({ initialMode }) {
                   Зарегистрироваться
                 </button>
               )}
-              {mode !== "reset" && (
-                <button className="font-semibold text-indigo-600 hover:text-indigo-500" onClick={() => setMode("reset")}>
-                  Сбросить пароль
-                </button>
-              )}
             </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Сменить пароль можно после входа в разделе «Настройки».
+            </p>
           </div>
         </div>
       </motion.div>
