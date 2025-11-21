@@ -175,7 +175,12 @@ function PermissionGate({ check, children }) {
   const permissionState = React.useMemo(() => buildPermissionState(user), [user]);
   const allowed = check ? check(permissionState) : true;
 
-  return allowed ? children : <NotFound />;
+  if (allowed) return children;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <NotFound />
+    </Suspense>
+  );
 }
 
 function buildPermissionState(user) {

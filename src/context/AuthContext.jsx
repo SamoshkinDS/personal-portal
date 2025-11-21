@@ -47,16 +47,18 @@ export function AuthProvider({ children }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      if (!res.ok) return false;
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { ok: false, message: data?.message || "Неверные логин или пароль." };
+      }
       localStorage.setItem("token", data.token);
       setUser(data.user);
       navigate("/", { replace: true });
-      return true;
+      return { ok: true };
     } catch (e) {
       console.error(e);
       toast.error("Ошибка входа");
-      return false;
+      return { ok: false, message: "Ошибка входа" };
     }
   };
 

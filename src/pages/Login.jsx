@@ -38,14 +38,16 @@ export default function Login({ initialMode }) {
   }, [modeFromQuery]);
 
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   // login form
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const submitLogin = async (e) => {
     e.preventDefault();
     setError("");
-    const ok = await login(loginForm.username.trim(), loginForm.password);
-    if (!ok) setError("Неверные логин или пароль.");
+    setNotice("");
+    const res = await login(loginForm.username.trim(), loginForm.password);
+    if (!res?.ok) setError(res?.message || "Неверные логин или пароль.");
   };
 
   // register form
@@ -53,6 +55,7 @@ export default function Login({ initialMode }) {
   const submitRegister = async (e) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     const res = await apiFetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,6 +66,8 @@ export default function Login({ initialMode }) {
       setError(data?.message || "Не удалось зарегистрировать пользователя.");
       return;
     }
+    const data = await res.json().catch(() => ({}));
+    setNotice(data?.message || "Заявка отправлена. После подтверждения вы сможете войти.");
     setMode("login");
   };
 
@@ -78,6 +83,7 @@ export default function Login({ initialMode }) {
   const checkUsername = async (e) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     if (!resetUsername.trim()) return setError("Введите имя пользователя.");
     const r = await apiFetch(`/api/auth/exists?username=${encodeURIComponent(resetUsername.trim())}`);
     const data = await r.json().catch(() => ({}));
@@ -90,6 +96,7 @@ export default function Login({ initialMode }) {
   const submitReset = async (e) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     const r = await apiFetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -264,6 +271,11 @@ export default function Login({ initialMode }) {
             {error && (
               <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
                 {error}
+              </div>
+            )}
+            {notice && !error && (
+              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {notice}
               </div>
             )}
 

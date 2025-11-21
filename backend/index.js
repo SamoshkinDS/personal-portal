@@ -38,6 +38,7 @@ import { ensureInterviewSchema } from "./db/interviewSchema.js";
 import { ensureTestsSchema } from "./db/testsSchema.js";
 import { ensureSettingsSchema } from "./db/settingsSchema.js";
 import { ensureCareerSchema } from "./db/careerSchema.js";
+import { ensureRegistrationRequestsSchema } from "./db/registrationRequestsSchema.js";
 import { syncVlessStats } from "./services/xray.js";
 import {
   createUtilityPlaceholders,
@@ -508,6 +509,7 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureSettingsSchema();
     await ensureCareerSchema();
     await ensurePromptmasterSchema();
+    await ensureRegistrationRequestsSchema();
     console.log("DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, plants, pests, diseases, medicines, analytics, promptmaster");
   } catch (err) {
     console.error("DB init error", err);
