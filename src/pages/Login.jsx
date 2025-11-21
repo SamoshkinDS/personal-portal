@@ -21,13 +21,6 @@ const MODES = {
     helper: "Уже есть аккаунт?",
     helperAction: "Войти",
   },
-  reset: {
-    title: "Сброс пароля",
-    subtitle: "Обновите пароль в два шага",
-    cta: "Продолжить",
-    helper: "Вспомнили пароль?",
-    helperAction: "Войти",
-  },
 };
 
 const cardTransition = { duration: 0.25, ease: "easeOut" };
@@ -39,7 +32,9 @@ export default function Login({ initialMode }) {
   const [mode, setMode] = useState(initialMode || modeFromQuery || "login");
 
   useEffect(() => {
-    if (modeFromQuery && modeFromQuery !== mode) setMode(modeFromQuery);
+    if (modeFromQuery && modeFromQuery !== mode && (modeFromQuery === "login" || modeFromQuery === "register")) {
+      setMode(modeFromQuery);
+    }
   }, [modeFromQuery]);
 
   const [error, setError] = useState("");
@@ -108,7 +103,16 @@ export default function Login({ initialMode }) {
     setMode("login");
   };
 
-  const current = MODES[mode];
+  const current =
+    mode === "reset"
+      ? {
+          title: "Сброс пароля",
+          subtitle: "Обновите пароль в два шага",
+          helper: "Вспомнили пароль?",
+          helperAction: "Войти",
+          cta: "Продолжить",
+        }
+      : MODES[mode] || MODES.login;
 
   const renderLogin = () => (
     <motion.form
@@ -180,15 +184,15 @@ export default function Login({ initialMode }) {
         value={resetUsername}
         onChange={(e) => setResetUsername(e.target.value)}
       />
-      {resetStep === 2 && (
-        <Input
-          label="Новый пароль"
-          type="password"
-          placeholder="Новый пароль"
-          value={resetPassword}
-          onChange={(e) => setResetPassword(e.target.value)}
-        />
-      )}
+      <Input
+        label="Новый пароль"
+        type="password"
+        placeholder="Новый пароль"
+        value={resetPassword}
+        onChange={(e) => setResetPassword(e.target.value)}
+        disabled={resetStep === 1}
+        helper={resetStep === 1 ? "Доступно после проверки пользователя" : ""}
+      />
       <PrimaryButton text={resetStep === 1 ? "Продолжить" : "Обновить пароль"} />
     </motion.form>
   );
@@ -196,7 +200,7 @@ export default function Login({ initialMode }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50 px-4 py-8 text-slate-900">
       <motion.div
-        className="relative w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200/70"
+        className="relative w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200/70"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
@@ -242,8 +246,8 @@ export default function Login({ initialMode }) {
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-full bg-slate-100 p-1 text-sm font-semibold text-slate-500">
-              {Object.keys(MODES).map((key) => (
+            <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-full bg-slate-100 p-1 text-sm font-semibold text-slate-500">
+              {["login", "register"].map((key) => (
                 <button
                   key={key}
                   type="button"
@@ -263,7 +267,7 @@ export default function Login({ initialMode }) {
               </div>
             )}
 
-            <div className="mt-6">
+            <div className="mt-6 min-h-[250px]">
               <AnimatePresence mode="wait">
                 {mode === "login" && renderLogin()}
                 {mode === "register" && renderRegister()}
@@ -296,7 +300,7 @@ export default function Login({ initialMode }) {
   );
 }
 
-function Input({ label, ...props }) {
+function Input({ label, helper, ...props }) {
   return (
     <label className="block space-y-1 text-sm">
       <span className="text-slate-600">{label}</span>
@@ -304,6 +308,7 @@ function Input({ label, ...props }) {
         {...props}
         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm outline-none ring-indigo-200 transition focus:border-indigo-300 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
       />
+      {helper ? <div className="text-xs text-slate-400">{helper}</div> : null}
     </label>
   );
 }
