@@ -45,6 +45,17 @@ const DEFAULT_LOCATIONS = [
 
 const DEFAULT_TAGS = ["суккулент", "цветущий", "тенелюбивый"];
 const DEFAULT_CATEGORIES = ["Комнатные", "Цветущие", "Суккуленты", "Деревья", "Ампельные"];
+const DEFAULT_TOOL_CATEGORIES = [
+  { name: "Грунты", slug: "soils", icon: "🌱" },
+  { name: "Горшки", slug: "pots", icon: "🪴" },
+  { name: "Удобрения", slug: "fertilizers", icon: "🧪" },
+  { name: "Освещение", slug: "lighting", icon: "💡" },
+  { name: "Инструменты", slug: "tools", icon: "🛠️" },
+  { name: "Химия и уход", slug: "care-chemistry", icon: "🧴" },
+  { name: "Контейнеры / Аксессуары", slug: "containers-accessories", icon: "📦" },
+  { name: "Дополнительные материалы", slug: "extra-materials", icon: "📌" },
+  { name: "Полив и влажность", slug: "watering-humidity", icon: "💧" },
+];
 
 async function seedDictionary(tableName, values) {
   for (const name of values) {
@@ -290,4 +301,69 @@ export async function ensurePlantsSchema() {
   await seedDictionary("dict_locations", DEFAULT_LOCATIONS);
   await seedDictionary("plant_tags", DEFAULT_TAGS);
   await seedDictionary("dict_categories", DEFAULT_CATEGORIES);
+  await ensureToolsSchema();
+}
+
+async function ensureToolsSchema() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tools_categories (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      icon TEXT,
+      is_active BOOLEAN DEFAULT TRUE,
+      sort_order INT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tools_items (
+      id SERIAL PRIMARY KEY,
+      category_id INT NOT NULL REFERENCES tools_categories(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT,
+      photo_url TEXT,
+      photo_preview_url TEXT,
+      photo_key TEXT,
+      photo_preview_key TEXT,
+      buy_link TEXT,
+      extra_fields JSONB DEFAULT '{}'::jsonb,
+      sort_order INT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_tools_items_category ON tools_items(category_id, sort_order, id);
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_timestamp_tools_categories') THEN
+        CREATE TRIGGER set_timestamp_tools_categories
+        BEFORE UPDATE ON tools_categories
+        FOR EACH ROW
+        EXECUTE FUNCTION set_updated_at();
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_timestamp_tools_items') THEN
+        CREATE TRIGGER set_timestamp_tools_items
+        BEFORE UPDATE ON tools_items
+        FOR EACH ROW
+        EXECUTE FUNCTION set_updated_at();
+      END IF;
+    END$$;
+  `);
+
+  for (const [index, cat] of DEFAULT_TOOL_CATEGORIES.entries()) {
+    await pool.query(
+      `
+      INSERT INTO tools_categories (name, slug, icon, sort_order)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (slug)
+      DO UPDATE SET name = EXCLUDED.name, icon = COALESCE(NULLIF(EXCLUDED.icon, ''), tools_categories.icon), sort_order = EXCLUDED.sort_order;
+    `,
+      [cat.name, cat.slug, cat.icon || null, index + 1]
+    );
+  }
 }

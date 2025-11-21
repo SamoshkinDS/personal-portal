@@ -116,11 +116,24 @@ const ICONS = {
       <path d="M11 16H7" />
     </svg>
   ),
+  tools: (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="m7 7 2-2 3 3-2 2z" />
+      <path d="m3 21 6-6 4 4-6 2z" />
+      <path d="m12 8 6.5 6.5a2 2 0 0 1-2.8 2.8L9.2 10.8" />
+      <path d="m14 4 6 6" />
+    </svg>
+  ),
   admin: (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
       <rect x="3" y="4" width="8" height="16" rx="2" />
       <rect x="13" y="8" width="8" height="12" rx="2" />
       <path d="M7 8h.01M7 12h.01M7 16h.01M17 12h.01M17 16h.01" />
+    </svg>
+  ),
+  cloud: (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="M18 10a4 4 0 0 0-7.9-1.2A3 3 0 0 0 6 11a3 3 0 0 0 .3 1.3A3.5 3.5 0 0 0 7 18.5h9a4 4 0 0 0 2-7.5Z" />
     </svg>
   ),
   logout: (
@@ -212,6 +225,7 @@ const NAV = [
     icon: ICONS.plants,
     children: [
       { id: "plants-list", path: "/plants", label: "Справочник", icon: ICONS.leaf },
+      { id: "plants-tools", path: "/plants/tools", label: "Материалы", icon: ICONS.tools },
       { id: "plants-problems", path: "/problems", label: "Проблемы", icon: ICONS.shield },
       { id: "plants-pests", path: "/pests", label: "Вредители", icon: ICONS.bug },
       { id: "plants-diseases", path: "/diseases", label: "Болезни", icon: ICONS.shield },
@@ -229,6 +243,7 @@ const NAV = [
       { id: "admin-users", path: "/admin/users", label: "Пользователи", icon: ICONS.doc },
       { id: "admin-content", path: "/admin/content", label: "Контент", icon: ICONS.doc },
       { id: "admin-logs", path: "/admin/logs", label: "Логи", icon: ICONS.chart },
+      { id: "admin-s3", path: "/admin/s3", label: "S3 Storage", icon: ICONS.cloud },
     ],
   },
   { id: "docs", path: "/docs", label: "Документация", icon: ICONS.docs },

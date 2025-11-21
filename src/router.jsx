@@ -42,6 +42,7 @@ const ResetPassword = React.lazy(() => import("./pages/ResetPassword.jsx"));
 const AdminHome = React.lazy(() => import("./pages/admin/Index.jsx"));
 const AdminContent = React.lazy(() => import("./pages/admin/Content.jsx"));
 const AdminLogs = React.lazy(() => import("./pages/admin/Logs.jsx"));
+const S3Manager = React.lazy(() => import("./pages/admin/S3Manager.jsx"));
 const AdminUsers = React.lazy(() => import("./pages/admin/Users.jsx"));
 const NotFound = React.lazy(() => import("./pages/NotFound.jsx"));
 const Home = React.lazy(() => import("./pages/Home.jsx"));
@@ -55,6 +56,8 @@ const DebugDnd = React.lazy(() => import("./pages/DebugDnd.jsx"));
 const PlantsList = React.lazy(() => import("./pages/plants/PlantsList.jsx"));
 const PlantDetail = React.lazy(() => import("./pages/plants/PlantDetail.jsx"));
 const PlantSettings = React.lazy(() => import("./pages/plants/PlantSettings.jsx"));
+const ToolsOverview = React.lazy(() => import("./pages/plants/ToolsOverview.jsx"));
+const ToolsCategory = React.lazy(() => import("./pages/plants/ToolsCategory.jsx"));
 const PestsList = React.lazy(() => import("./pages/care/PestsList.jsx"));
 const PestDetail = React.lazy(() => import("./pages/care/PestDetail.jsx"));
 const DiseasesList = React.lazy(() => import("./pages/care/DiseasesList.jsx"));
@@ -74,9 +77,9 @@ const PortfolioExportPage = React.lazy(() => import("./pages/career/PortfolioExp
 const PortfolioTimelinePage = React.lazy(() => import("./pages/career/PortfolioTimelinePage.tsx"));
 const AnalyticsPage = React.lazy(() => import("./pages/career/AnalyticsPage.tsx"));
 
-function RouteTransition({ children }) {
+function RouteTransition({ children, disable = false }) {
   const location = useLocation();
-  const disableRouteTransition = location.state?.disableRouteTransition;
+  const disableRouteTransition = disable || location.state?.disableRouteTransition;
   const motionProps = disableRouteTransition
     ? {
         initial: false,
@@ -228,7 +231,7 @@ export const router = createBrowserRouter(
         <Route
           index
           element={
-            <RouteTransition>
+            <RouteTransition disable>
               <Home />
             </RouteTransition>
           }
@@ -446,6 +449,22 @@ export const router = createBrowserRouter(
           element={
             <RouteTransition>
               <PlantsList />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="plants/tools"
+          element={
+            <RouteTransition>
+              <ToolsOverview />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="plants/tools/:slug"
+          element={
+            <RouteTransition>
+              <ToolsCategory />
             </RouteTransition>
           }
         />
@@ -719,6 +738,16 @@ export const router = createBrowserRouter(
             <PermissionGate check={canAccessAdmin}>
               <RouteTransition>
                 <AdminContent />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="admin/s3"
+          element={
+            <PermissionGate check={canAccessAdmin}>
+              <RouteTransition>
+                <S3Manager />
               </RouteTransition>
             </PermissionGate>
           }
