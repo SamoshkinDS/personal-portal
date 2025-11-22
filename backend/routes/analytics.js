@@ -28,6 +28,17 @@ function normalizeTags(tags) {
     .slice(0, 20);
 }
 
+function slugifyTitle(title) {
+  const base = String(title || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0430-\u044f\u0451\u0456\u0457\u0454\u0491\s-]/gi, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return base || `topic-${Date.now()}`;
+}
+
 function mapTopic(row) {
   return {
     id: row.id,
@@ -245,6 +256,187 @@ analyticsRouter.get("/topics/:idOrSlug", async (req, res) => {
   } catch (e) {
     console.error("GET /api/analytics/topics/:idOrSlug", e);
     return res.status(500).json({ message: "Не удалось загрузить тему" });
+  }
+});
+
+analyticsRouter.post("/topics", async (req, res) => {
+  try {
+    const { title, description, tags = [], parentTopicId } = req.body || {};
+    const trimmedTitle = String(title || "").trim();
+    if (!trimmedTitle) return res.status(400).json({ message: "Название обязательно" });
+
+    let parentId = null;
+    if (parentTopicId !== undefined && parentTopicId !== null && parentTopicId !== "") {
+      const pid = Number(parentTopicId);
+      if (!Number.isFinite(pid)) return res.status(400).json({ message: "Некорректный parentTopicId" });
+      const p = await pool.query("SELECT id FROM topics WHERE id = $1", [pid]);
+      if (!p.rows.length) return res.status(404).json({ message: "Родительская тема не найдена" });
+      parentId = pid;
+    }
+
+    const normalizedTags = normalizeTags(tags);
+    let slug = slugifyTitle(trimmedTitle);
+    for (let i = 0; i < 5; i++) {
+      const exists = await pool.query("SELECT 1 FROM topics WHERE slug = $1", [slug]);
+      if (!exists.rows.length) break;
+      slug = `${slug}-${Math.floor(Math.random() * 10000)}`;
+    }
+
+    const ins = await pool.query(
+      `
+      INSERT INTO topics (slug, title, description, tags, parent_topic_id)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `,
+      [slug, trimmedTitle, description || null, normalizedTags, parentId]
+    );
+
+    return res.status(201).json({ topic: mapTopic(ins.rows[0]) });
+  } catch (e) {
+    console.error("POST /api/analytics/topics", e);
+    return res.status(500).json({ message: "Не удалось создать тему" });
+  }
+});
+
+analyticsRouter.patch("/topics/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Некорректный id" });
+    const { title, description, tags, parentTopicId } = req.body || {};
+    if (
+      typeof title === "undefined" &&
+      typeof description === "undefined" &&
+      typeof tags === "undefined" &&
+      typeof parentTopicId === "undefined"
+    ) {
+      return res.status(400).json({ message: "Нет данных для обновления" });
+    }
+
+    let parentId = null;
+    if (typeof parentTopicId !== "undefined" && parentTopicId !== "") {
+      const pid = Number(parentTopicId);
+      if (!Number.isFinite(pid)) return res.status(400).json({ message: "Некорректный parentTopicId" });
+      if (pid === id) return res.status(400).json({ message: "Тема не может ссылаться сама на себя" });
+      const p = await pool.query("SELECT id, parent_topic_id FROM topics WHERE id = $1", [pid]);
+      if (!p.rows.length) return res.status(404).json({ message: "Родительская тема не найдена" });
+      // prevent циклов: поднимаемся вверх
+      let cursor = p.rows[0].parent_topic_id;
+      while (cursor) {
+        if (cursor === id) return res.status(400).json({ message: "Нельзя сделать дочерней собственную тему" });
+        const next = await pool.query("SELECT parent_topic_id FROM topics WHERE id = $1", [cursor]);
+        cursor = next.rows?.[0]?.parent_topic_id || null;
+      }
+      parentId = pid;
+    } else if (parentTopicId === "") {
+      parentId = null;
+    }
+
+    const updates = [];
+    const params = [];
+    if (typeof title !== "undefined") {
+      params.push(String(title || "").trim());
+      updates.push(`title = $${params.length}`);
+    }
+    if (typeof description !== "undefined") {
+      params.push(description || null);
+      updates.push(`description = $${params.length}`);
+    }
+    if (typeof tags !== "undefined") {
+      params.push(normalizeTags(tags));
+      updates.push(`tags = $${params.length}`);
+    }
+    if (typeof parentTopicId !== "undefined") {
+      params.push(parentId);
+      updates.push(`parent_topic_id = $${params.length}`);
+    }
+    params.push(id);
+
+    const upd = await pool.query(
+      `
+      UPDATE topics
+      SET ${updates.join(", ")}, updated_at = now()
+      WHERE id = $${params.length}
+      RETURNING *
+    `,
+      params
+    );
+    if (!upd.rows.length) return res.status(404).json({ message: "Тема не найдена" });
+    return res.json({ topic: mapTopic(upd.rows[0]) });
+  } catch (e) {
+    console.error("PATCH /api/analytics/topics/:id", e);
+    return res.status(500).json({ message: "Не удалось обновить тему" });
+  }
+});
+
+analyticsRouter.delete("/topics/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Некорректный id" });
+    const force = String(req.query.force || "").toLowerCase() === "true";
+
+    const topic = await pool.query("SELECT * FROM topics WHERE id = $1", [id]);
+    if (!topic.rows.length) return res.status(404).json({ message: "Тема не найдена" });
+
+    const articlesCountRes = await pool.query("SELECT COUNT(*)::int AS c FROM articles WHERE topic_id = $1", [id]);
+    const subtopicsCountRes = await pool.query("SELECT COUNT(*)::int AS c FROM topics WHERE parent_topic_id = $1", [id]);
+    const counts = {
+      articles: articlesCountRes.rows[0].c || 0,
+      subtopics: subtopicsCountRes.rows[0].c || 0,
+    };
+
+    if (!force && (counts.articles > 0 || counts.subtopics > 0)) {
+      return res.status(400).json({
+        message: "Есть связанные материалы. Подтвердите удаление.",
+        counts,
+      });
+    }
+
+    await pool.query("DELETE FROM articles WHERE topic_id = $1", [id]);
+    await pool.query("DELETE FROM topics WHERE id = $1", [id]);
+
+    return res.json({ message: "Тема удалена", counts });
+  } catch (e) {
+    console.error("DELETE /api/analytics/topics/:id", e);
+    return res.status(500).json({ message: "Не удалось удалить тему" });
+  }
+});
+
+analyticsRouter.post("/topics", async (req, res) => {
+  try {
+    const { title, description, tags = [], parentTopicId } = req.body || {};
+    const trimmedTitle = String(title || "").trim();
+    if (!trimmedTitle) return res.status(400).json({ message: "Название обязательно" });
+
+    let parentId = null;
+    if (parentTopicId !== undefined && parentTopicId !== null) {
+      const pid = Number(parentTopicId);
+      if (!Number.isFinite(pid)) return res.status(400).json({ message: "Некорректный parentTopicId" });
+      const p = await pool.query("SELECT id FROM topics WHERE id = $1", [pid]);
+      if (!p.rows.length) return res.status(404).json({ message: "Родительская тема не найдена" });
+      parentId = pid;
+    }
+
+    const normalizedTags = normalizeTags(tags);
+    let slug = slugifyTitle(trimmedTitle);
+    for (let i = 0; i < 5; i++) {
+      const exists = await pool.query("SELECT 1 FROM topics WHERE slug = $1", [slug]);
+      if (!exists.rows.length) break;
+      slug = `${slug}-${Math.floor(Math.random() * 10000)}`;
+    }
+
+    const ins = await pool.query(
+      `
+      INSERT INTO topics (slug, title, description, tags, parent_topic_id)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `,
+      [slug, trimmedTitle, description || null, normalizedTags, parentId]
+    );
+
+    return res.status(201).json({ topic: mapTopic(ins.rows[0]) });
+  } catch (e) {
+    console.error("POST /api/analytics/topics", e);
+    return res.status(500).json({ message: "Не удалось создать тему" });
   }
 });
 

@@ -142,7 +142,14 @@ function PrivateLayout() {
   React.useEffect(() => {
     if (!isAuth) return;
     // Re-run push registration whenever the user gains auth so subscriptions get recreated after login
-    registerPush();
+    const timeout = setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        requestIdleCallback(() => registerPush());
+      } else {
+        registerPush();
+      }
+    }, 3000);
+    return () => clearTimeout(timeout);
   }, [isAuth]);
 
   React.useEffect(() => {

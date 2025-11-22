@@ -38,9 +38,30 @@ export const analyticsApi = {
     const res = await apiAuthFetch(`/api/analytics/topics${buildQuery(params)}`);
     return jsonOrThrow(res, "Не удалось загрузить темы");
   },
+  async createTopic(payload) {
+    const res = await apiAuthFetch("/api/analytics/topics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return jsonOrThrow(res, "Не удалось создать тему");
+  },
   async getTopic(idOrSlug) {
     const res = await apiAuthFetch(`/api/analytics/topics/${encodeURIComponent(idOrSlug)}`);
     return jsonOrThrow(res, "Не удалось загрузить тему");
+  },
+  async updateTopic(id, payload) {
+    const res = await apiAuthFetch(`/api/analytics/topics/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return jsonOrThrow(res, "Не удалось обновить тему");
+  },
+  async deleteTopic(id, { force = false } = {}) {
+    const qs = force ? "?force=true" : "";
+    const res = await apiAuthFetch(`/api/analytics/topics/${id}${qs}`, { method: "DELETE" });
+    return jsonOrThrow(res, "Не удалось удалить тему");
   },
   async getArticle(id) {
     const res = await apiAuthFetch(`/api/analytics/articles/${id}`);
