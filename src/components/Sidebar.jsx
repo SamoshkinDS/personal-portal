@@ -33,6 +33,16 @@ const ICONS = {
       <path d="M8 10h8" />
     </svg>
   ),
+  car: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="M3 13h18" />
+      <path d="M5 17h2" />
+      <path d="M17 17h2" />
+      <path d="M5 13 7.5 7.5a2 2 0 0 1 1.8-1.2h5.4a2 2 0 0 1 1.8 1.2L19 13" />
+      <circle cx="7" cy="17.5" r="1.5" />
+      <circle cx="17" cy="17.5" r="1.5" />
+    </svg>
+  ),
   docs: (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
       <path d="M5 3h10l4 4v14H5z" />
@@ -147,6 +157,7 @@ const ICONS = {
 
 const NAV = [
   { id: "home", path: "/", label: "Главная", icon: ICONS.home },
+  { id: "car", path: "/car", label: "Авто", icon: ICONS.car },
   {
     id: "analytics",
     path: "/analytics",
