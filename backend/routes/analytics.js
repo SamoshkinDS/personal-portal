@@ -2,6 +2,7 @@ import express from "express";
 import { pool } from "../db/connect.js";
 import { authRequired, requirePermission } from "../middleware/auth.js";
 import { verifyJwt } from "../lib/jwt.js";
+import sanitizeHtml from "sanitize-html";
 
 const analyticsRouter = express.Router();
 const articlesRouter = express.Router();
@@ -10,6 +11,14 @@ const articlesQueueRouter = express.Router();
 const VALID_STATUSES = new Set(["draft", "processing", "finished", "published"]);
 const analyticsGuard = [authRequired, requirePermission(["view_analytics"])];
 const QUEUE_TOKEN = (process.env.ARTICLES_QUEUE_TOKEN || "").trim();
+const SANITIZE_OPTS = {
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat(["h1", "h2", "img", "table", "thead", "tbody", "tr", "th", "td"]),
+  allowedAttributes: {
+    a: ["href", "name", "target", "rel"],
+    img: ["src", "alt", "title", "width", "height"],
+    "*": ["class", "style"],
+  },
+};
 
 function normalizeTags(tags) {
   if (!Array.isArray(tags)) return [];
@@ -40,7 +49,7 @@ function mapArticle(row) {
     queueId: row.queue_id,
     title: row.title,
     summary: row.summary,
-    content: row.content,
+    content: sanitizeHtml(row.content || "", SANITIZE_OPTS),
     tags: row.tags || [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -53,7 +62,7 @@ function mapQueue(row) {
     title: row.title,
     description: row.description,
     status: row.status,
-    content: row.content,
+    content: sanitizeHtml(row.content || "", SANITIZE_OPTS),
     tags: row.tags || [],
     publishedArticleId: row.published_article_id,
     publishedTopicId: row.published_topic_id,

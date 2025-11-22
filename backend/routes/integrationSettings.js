@@ -1,6 +1,6 @@
 import express from "express";
 import { pool } from "../db/connect.js";
-import { authRequired } from "../middleware/auth.js";
+import { authRequired, requirePermission } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -13,7 +13,7 @@ const VALID_KEYS = new Set([
   "api_log_requests",
 ]);
 
-router.use(authRequired);
+router.use(authRequired, requirePermission("admin_access"));
 
 router.get("/settings", async (_req, res) => {
   try {
