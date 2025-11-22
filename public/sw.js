@@ -18,8 +18,8 @@ self.addEventListener('push', (event) => {
     const options = {
       body,
       data: { url },
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: '/icon-512.svg',
+      badge: '/icon-512.svg',
     };
     event.waitUntil(self.registration.showNotification(title, options));
   } catch (e) {

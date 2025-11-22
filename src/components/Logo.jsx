@@ -21,7 +21,7 @@ export default function Logo({ showName = true, size = "md", className = "" }) {
         className={`${imgSize} shrink-0 rounded-xl ring-1 ring-black/5 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center overflow-hidden`}
       >
         <img
-          src={"/favi.png"}
+          src={"/icon-512.png"}
           alt="Логотип SAMOSHECHKIN"
           className="h-10 w-10 object-contain"
           loading="lazy"
