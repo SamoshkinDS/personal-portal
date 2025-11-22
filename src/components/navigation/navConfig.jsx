@@ -144,6 +144,14 @@ export const NAV_ICONS = {
       <path d="M7 8h.01M7 12h.01M7 16h.01M17 12h.01M17 16h.01" />
     </svg>
   ),
+  flipper: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <rect x="5" y="4" width="14" height="16" rx="3" />
+      <rect x="8" y="7" width="8" height="4" rx="1" />
+      <path d="M9 15h6" />
+      <circle cx="12" cy="17.5" r="1" />
+    </svg>
+  ),
   cloud: (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
       <path d="M18 10a4 4 0 0 0-7.9-1.2A3 3 0 0 0 6 11a3 3 0 0 0 .3 1.3A3.5 3.5 0 0 0 7 18.5h9a4 4 0 0 0 2-7.5Z" />
@@ -204,6 +212,7 @@ export const DEFAULT_NAV_ITEMS = [
       { id: "ai-promptmaster", path: "/ai/promptmaster", label: "Promptmaster", icon: NAV_ICONS.doc },
     ],
   },
+  { id: "flipper", path: "/flipper", label: "Flipper Zero", icon: NAV_ICONS.flipper },
   {
     id: "accounting",
     path: "/accounting",

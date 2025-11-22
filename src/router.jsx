@@ -30,6 +30,7 @@ const N8NIntegration = React.lazy(() => import("./pages/N8NIntegration.jsx"));
 const Promptmaster = React.lazy(() => import("./pages/Promptmaster.jsx"));
 const Docs = React.lazy(() => import("./pages/Docs.jsx"));
 const Posts = React.lazy(() => import("./pages/Posts.jsx"));
+const FlipperZero = React.lazy(() => import("./pages/flipper/FlipperZero.jsx"));
 const Settings = React.lazy(() => import("./pages/Settings.jsx"));
 const AccountingDashboard = React.lazy(() => import("./pages/accounting/Dashboard.jsx"));
 const AccountingAccounts = React.lazy(() => import("./pages/accounting/Accounts.jsx"));
@@ -583,6 +584,14 @@ export const router = createBrowserRouter(
           element={
             <RouteTransition>
               <Posts />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper"
+          element={
+            <RouteTransition>
+              <FlipperZero />
             </RouteTransition>
           }
         />
