@@ -145,7 +145,7 @@ export default function ToolsCategory() {
   };
 
   return (
-    <PageShell
+    <PageShell hideBreadcrumbs
       title={category?.name || "Материалы и оборудование"}
       contentClassName="flex flex-col gap-6"
     >

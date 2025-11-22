@@ -254,7 +254,7 @@ export default function PlantDetail() {
   const articleMarkdown = React.useMemo(() => (article?.content_text || "").trim(), [article]);
 
   return (
-    <PageShell title={plant ? plant.common_name : "Карточка растения"} contentClassName="flex flex-col gap-6">
+    <PageShell hideBreadcrumbs title={plant ? plant.common_name : "Карточка растения"} contentClassName="flex flex-col gap-6">
       <PlantsBreadcrumbs
         items={[
           { label: "Растения", to: "/plants" },

@@ -138,7 +138,7 @@ export default function MedicineDetail() {
   }, [medicine]);
 
   return (
-    <PageShell title={medicine ? medicine.name : "Карточка лекарства"} contentClassName="flex flex-col gap-6">
+    <PageShell hideBreadcrumbs title={medicine ? medicine.name : "Карточка лекарства"} contentClassName="flex flex-col gap-6">
       <PlantsBreadcrumbs
         items={[
           { label: "Растения", to: "/plants" },

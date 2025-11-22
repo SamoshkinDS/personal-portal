@@ -76,70 +76,7 @@ const CONTEXT_SECTIONS = [
 ];
 
 export default function MobileNavCarousel() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const pathname = location.pathname;
-
-  const contextSection = React.useMemo(
-    () => CONTEXT_SECTIONS.find((section) => section.match(pathname)),
-    [pathname],
-  );
-
-  const cards = React.useMemo(() => {
-    if (!contextSection) return baseNavItems;
-    const stack = contextSection.items.map((item) => ({ ...item }));
-    return [
-      {
-        id: "back",
-        title: "Назад",
-        icon: BackIcon,
-        action: () => {
-          if (typeof window !== "undefined" && window.history.length > 1) {
-            navigate(-1);
-          } else {
-            navigate("/");
-          }
-        },
-      },
-      ...stack,
-    ];
-  }, [contextSection, navigate]);
-
-  return (
-    <div className="md:hidden -mx-4 mb-2 sm:-mx-6">
-      <div className="flex gap-3 overflow-x-auto px-4 pb-3 sm:px-6 snap-x snap-mandatory">
-        {cards.map((item) => {
-          const Icon = item.icon;
-          const active = item.link ? pathname.startsWith(item.link) : false;
-          const commonClasses = `snap-start flex min-w-[110px] max-w-[140px] flex-col items-center gap-2 rounded-xl border px-3 py-3 text-center text-xs font-semibold shadow-sm backdrop-blur ${
-            active
-              ? "border-blue-400/60 bg-blue-500/10 text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-100"
-              : "border-white/60 bg-white/70 text-slate-700 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-100"
-          }`;
-          const content = (
-            <>
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/80 text-xl shadow-sm ring-1 ring-black/5 dark:bg-slate-800/70 dark:ring-white/10">
-                <Icon className="h-5 w-5" />
-              </span>
-              <span className="text-[13px] leading-tight">{item.title}</span>
-            </>
-          );
-          if (item.action) {
-            return (
-              <button key={item.id || item.title} type="button" onClick={item.action} className={commonClasses}>
-                {content}
-              </button>
-            );
-          }
-          return (
-            <Link key={item.link} to={item.link} className={commonClasses}>
-              {content}
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
+  return null;
 }
 
 function ChartIcon(props) {

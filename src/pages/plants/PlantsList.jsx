@@ -270,7 +270,7 @@ export default function PlantsList() {
   };
 
   return (
-    <PageShell title="Растения" contentClassName="flex flex-col gap-6">
+    <PageShell title="Растения" contentClassName="flex flex-col gap-6" hideBreadcrumbs>
       <PlantsBreadcrumbs items={[{ label: "Растения" }]} />
       <div className="space-y-6">
         <div className="flex flex-wrap gap-3">

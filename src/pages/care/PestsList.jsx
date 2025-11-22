@@ -186,7 +186,7 @@ export default function PestsList() {
   const chips = getFilterChips({ danger: dangerFilters, active: activeFilters });
 
   return (
-    <PageShell title="Вредители" contentClassName="flex flex-col gap-6">
+    <PageShell hideBreadcrumbs title="Вредители" contentClassName="flex flex-col gap-6">
       <PlantsBreadcrumbs
         items={[
           { label: "Растения", to: "/plants" },

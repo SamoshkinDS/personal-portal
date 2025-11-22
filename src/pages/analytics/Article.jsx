@@ -93,7 +93,7 @@ export default function ArticlePage() {
 
   if (!data && loading) {
     return (
-      <PageShell title="Статья">
+      <PageShell hideBreadcrumbs title="Статья">
         <div className="h-64 animate-pulse rounded-3xl bg-slate-100 dark:bg-slate-800/80" />
       </PageShell>
     );

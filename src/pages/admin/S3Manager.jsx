@@ -210,145 +210,55 @@ export default function S3Manager() {
   };
 
   return (
-    <PageShell title="S3 Storage Manager" contentClassName="flex gap-4 bg-transparent p-0">
-      <aside className="w-64 shrink-0 rounded-3xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/70">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Buckets</h3>
-          <button
-            type="button"
-            onClick={() => setModals((p) => ({ ...p, createBucket: true }))}
-            className="rounded-xl bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500"
-          >
-            Add
-          </button>
-        </div>
-        <div className="mt-3 space-y-1">
-          {loadingBuckets ? (
-            <div className="h-32 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
-          ) : buckets.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Нет бакетов.</p>
-          ) : (
-            buckets.map((b) => {
-              const active = b.name === selectedBucket;
-              return (
-                <button
-                  key={b.name}
-                  type="button"
-                  onClick={() => {
-                    setSelectedBucket(b.name);
-                    loadObjects(b.name, "");
-                  }}
-                  className={`flex w-full flex-col rounded-2xl px-3 py-2 text-left text-sm shadow-sm transition ${
-                    active
-                      ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-100 dark:ring-blue-400/40"
-                      : "bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                  }`}
-                >
-                  <span className="font-semibold">{b.name}</span>
-                  {b.created && (
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {new Date(b.created).toLocaleString()}
-                    </span>
-                  )}
-                </button>
-              );
-            })
-          )}
-        </div>
-      </aside>
-
-      <section className="flex min-w-0 flex-1 flex-col gap-3 rounded-3xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/70">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {selectedBucket && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setModals((p) => ({ ...p, createFolder: true }))}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
-                >
-                  Create Folder
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModals((p) => ({ ...p, upload: true }))}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
-                >
-                  Upload File
-                </button>
-                <button
-                  type="button"
-                  onClick={handleMakePublic}
-                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:border-emerald-300 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100"
-                >
-                  Make Public
-                </button>
-                <button
-                  type="button"
-                  onClick={handleMakePrivate}
-                  className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:border-amber-300 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
-                >
-                  Make Private
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteBucket}
-                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
-                >
-                  Delete Bucket
-                </button>
-              </>
-            )}
-            {selection?.type === "folder" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setModals((p) => ({ ...p, upload: true }))}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
-                >
-                  Upload File
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModals((p) => ({ ...p, confirmDelete: true }))}
-                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
-                >
-                  Delete Folder
-                </button>
-              </>
-            )}
-            {selection?.type === "file" && (
-              <>
-                <a
-                  href={
-                    objects.publicBase
-                      ? `${objects.publicBase.replace(/\/$/, "")}/${selection.name}`
-                      : "#"
-                  }
-                  download
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
-                >
-                  Download
-                </a>
-                <button
-                  type="button"
-                  onClick={copyLink}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
-                >
-                  Copy Public Link
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModals((p) => ({ ...p, confirmDelete: true }))}
-                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
-                >
-                  Delete
-                </button>
-              </>
+    <PageShell title="S3 Storage Manager" contentClassName="flex flex-col gap-3 bg-transparent p-0">
+      <div className="flex flex-col gap-3 md:flex-row">
+        <aside className="w-full md:w-64 shrink-0 rounded-3xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/70">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Buckets</h3>
+            <button
+              type="button"
+              onClick={() => setModals((p) => ({ ...p, createBucket: true }))}
+              className="rounded-xl bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500"
+            >
+              Add
+            </button>
+          </div>
+          <div className="mt-3 space-y-1">
+            {loadingBuckets ? (
+              <div className="h-32 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+            ) : buckets.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">Нет бакетов.</p>
+            ) : (
+              buckets.map((b) => {
+                const active = b.name === selectedBucket;
+                return (
+                  <button
+                    key={b.name}
+                    type="button"
+                    onClick={() => {
+                      setSelectedBucket(b.name);
+                      loadObjects(b.name, "");
+                    }}
+                    className={`flex w-full flex-col rounded-2xl px-3 py-2 text-left text-sm shadow-sm transition ${
+                      active
+                        ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-100 dark:ring-blue-400/40"
+                        : "bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    <span className="font-semibold">{b.name}</span>
+                    {b.created && (
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {new Date(b.created).toLocaleString()}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
-        </div>
+        </aside>
 
+      <section className="flex min-w-0 flex-1 flex-col gap-3 rounded-3xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/70">
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-300">
           <button
             type="button"
@@ -369,6 +279,94 @@ export default function S3Manager() {
               </button>
             </React.Fragment>
           ))}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {selectedBucket && (
+            <>
+              <button
+                type="button"
+                onClick={() => setModals((p) => ({ ...p, createFolder: true }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
+              >
+                Create Folder
+              </button>
+              <button
+                type="button"
+                onClick={() => setModals((p) => ({ ...p, upload: true }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
+              >
+                Upload File
+              </button>
+              <button
+                type="button"
+                onClick={handleMakePublic}
+                className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:border-emerald-300 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100"
+              >
+                Make Public
+              </button>
+              <button
+                type="button"
+                onClick={handleMakePrivate}
+                className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:border-amber-300 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+              >
+                Make Private
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteBucket}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:border-rose-300 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
+              >
+                Delete Bucket
+              </button>
+            </>
+          )}
+          {selection?.type === "folder" && (
+            <>
+              <button
+                type="button"
+                onClick={() => setModals((p) => ({ ...p, upload: true }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
+              >
+                Upload File
+              </button>
+              <button
+                type="button"
+                onClick={() => setModals((p) => ({ ...p, confirmDelete: true }))}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:border-rose-300 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
+              >
+                Delete Folder
+              </button>
+            </>
+          )}
+          {selection?.type === "file" && (
+            <>
+              <a
+                href={
+                  objects.publicBase
+                    ? `${objects.publicBase.replace(/\/$/, "")}/${selection.name}`
+                    : "#"
+                }
+                download
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
+              >
+                Download
+              </a>
+              <button
+                type="button"
+                onClick={copyLink}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
+              >
+                Copy Public Link
+              </button>
+              <button
+                type="button"
+                onClick={() => setModals((p) => ({ ...p, confirmDelete: true }))}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:border-rose-300 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
+              >
+                Delete
+              </button>
+            </>
+          )}
         </div>
 
         <div className="min-h-[320px] flex-1 rounded-2xl border border-slate-200/70 bg-white/80 p-3 shadow-inner dark:border-slate-800/70 dark:bg-slate-900/60">
@@ -437,6 +435,7 @@ export default function S3Manager() {
           )}
         </div>
       </section>
+      </div>
 
       <Modal
         open={modals.createBucket}
@@ -573,5 +572,5 @@ export default function S3Manager() {
         </div>
       </Modal>
     </PageShell>
-  );
-}
+    );
+  }

@@ -170,7 +170,7 @@ export default function DiseasesList() {
   };
 
   return (
-    <PageShell title="Заболевания" contentClassName="flex flex-col gap-6">
+    <PageShell hideBreadcrumbs title="Заболевания" contentClassName="flex flex-col gap-6">
       <PlantsBreadcrumbs
         items={[
           { label: "Растения", to: "/plants" },

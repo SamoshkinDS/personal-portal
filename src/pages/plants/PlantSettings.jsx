@@ -160,7 +160,7 @@ export default function PlantSettings() {
 
 
   return (
-    <PageShell title="Настройки растений" contentClassName="space-y-6">
+    <PageShell hideBreadcrumbs title="Настройки растений" contentClassName="space-y-6">
       {loading ? (
         <div className="h-40 animate-pulse rounded-3xl border border-slate-100 bg-white/80 dark:border-white/10 dark:bg-slate-900/40" />
       ) : (

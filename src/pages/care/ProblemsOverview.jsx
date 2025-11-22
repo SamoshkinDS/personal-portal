@@ -107,7 +107,7 @@ export default function ProblemsOverview() {
   const skeletons = React.useMemo(() => Array.from({ length: 6 }), []);
 
   return (
-    <PageShell title="Проблемы и решения" contentClassName="flex flex-col gap-6">
+    <PageShell hideBreadcrumbs title="Проблемы и решения" contentClassName="flex flex-col gap-6">
       <PlantsBreadcrumbs
         items={[
           { label: "Растения", to: "/plants" },

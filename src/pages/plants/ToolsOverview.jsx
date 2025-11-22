@@ -73,7 +73,7 @@ export default function ToolsOverview() {
   }, []);
 
   return (
-    <PageShell title="Материалы и оборудование" contentClassName="flex flex-col gap-6">
+    <PageShell hideBreadcrumbs title="Материалы и оборудование" contentClassName="flex flex-col gap-6">
       <PlantsBreadcrumbs
         items={[
           { label: "Растения", href: "/plants" },

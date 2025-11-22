@@ -165,7 +165,7 @@ export default function DiseaseDetail() {
   };
 
   return (
-    <PageShell title={disease ? disease.name : "Карточка заболевания"} contentClassName="flex flex-col gap-6">
+    <PageShell hideBreadcrumbs title={disease ? disease.name : "Карточка заболевания"} contentClassName="flex flex-col gap-6">
       <PlantsBreadcrumbs
         items={[
           { label: "Растения", to: "/plants" },

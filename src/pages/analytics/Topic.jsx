@@ -118,7 +118,7 @@ export default function TopicPage() {
 
   if (!data && loading) {
     return (
-      <PageShell title="Тема">
+      <PageShell hideBreadcrumbs title="Тема">
         <div className="h-64 animate-pulse rounded-3xl bg-slate-100 dark:bg-slate-800/80" />
       </PageShell>
     );

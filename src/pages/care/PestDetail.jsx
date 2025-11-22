@@ -165,7 +165,7 @@ export default function PestDetail() {
   };
 
   return (
-    <PageShell title={pest ? pest.name : "Карточка вредителя"} contentClassName="flex flex-col gap-6">
+    <PageShell hideBreadcrumbs title={pest ? pest.name : "Карточка вредителя"} contentClassName="flex flex-col gap-6">
       <PlantsBreadcrumbs
         items={[
           { label: "Растения", to: "/plants" },
