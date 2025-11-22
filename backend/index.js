@@ -31,6 +31,7 @@ import integrationSettingsRoutes from "./routes/integrationSettings.js";
 import careerRoutes from "./routes/career.js";
 import carRoutes from "./routes/car.js";
 import s3ManagerRoutes from "./routes/s3manager.js";
+import homeRoutes from "./routes/home.js";
 import { pool } from "./db/connect.js";
 import { ensurePlantsSchema } from "./db/plantsSchema.js";
 import { ensureCareCatalogSchema } from "./db/careSchema.js";
@@ -43,6 +44,7 @@ import { ensureSettingsSchema } from "./db/settingsSchema.js";
 import { ensureCareerSchema } from "./db/careerSchema.js";
 import { ensureCarSchema } from "./db/carSchema.js";
 import { ensureRegistrationRequestsSchema } from "./db/registrationRequestsSchema.js";
+import { ensureHomeSchema } from "./db/homeSchema.js";
 import { syncVlessStats } from "./services/xray.js";
 import {
   createUtilityPlaceholders,
@@ -93,6 +95,7 @@ app.use("/api/promptmaster", promptmasterRoutes);
 app.use("/api/career", careerRoutes);
 app.use("/api/car", carRoutes);
 app.use("/api/s3", s3ManagerRoutes);
+app.use("/api/home", homeRoutes);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
 const ACCOUNTING_JOBS_ENABLED = String(process.env.ACCOUNTING_JOBS_DISABLED || "false").toLowerCase() !== "true";
@@ -517,8 +520,11 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureCareerSchema();
     await ensureCarSchema();
     await ensurePromptmasterSchema();
+    await ensureHomeSchema();
     await ensureRegistrationRequestsSchema();
-    console.log("DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car");
+    console.log(
+      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home"
+    );
   } catch (err) {
     console.error("DB init error", err);
   }

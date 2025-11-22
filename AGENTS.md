@@ -13,6 +13,7 @@ AGENTS: Personal Portal
 - Основные домены:
   - Домашний дашборд и задачи (todos, списки задач, заметки).
   - Аналитика: темы, статьи, очередь публикаций, интервью, знания/тесты.
+  - Квартира: управляющая компания, телефоны, внешние камеры и учёт водяных счётчиков (/home).
   - AI-разделы: общие AI-инструменты (`AI.jsx`), интеграция с n8n, Promptmaster.
   - Профессиональное развитие: навыки, курсы, портфолио, интервью и технические знания с REST-API под `/api/career`, включая `/dashboard` (кэшируется 5 минут), `/dashboard/activity` и секцию портфолио.
 - Курсы: `/career/courses` — список курсов, фильтры по статусу/платформе/периоду, прогресс/рейтинги, привязка навыков и работа с сертификатами.
@@ -115,6 +116,7 @@ AGENTS: Personal Portal
   - `accounting/` — финансы.
   - `vpn/` — Outline/VLESS UI и гайды.
   - `car/` - страница автомобиля (Changan UNI V).
+  - `home/` - Квартира: УК, телефоны, камеры, счётчики.
 - `plants/` и `care/` — растения и уход.
 - `admin/` — админ-панель.
 - `career/` — страница дашборда профессионального развития с метриками, радаром и активностью.
@@ -127,7 +129,7 @@ AGENTS: Personal Portal
 - базовые страницы: `Home`, `AI`, `N8NIntegration`, `Promptmaster`, `Docs`, `Settings`, `Login`, `DebugDnd`, `NotFound` и др.
 - `components/` — переиспользуемые компоненты (Layout, Sidebar, Header, модалки и т.п.).
 - `context/` — контексты (в первую очередь `AuthContext`).
-- `api/` — API-клиенты поверх `apiAuthFetch` (`analytics.js`, `accounting.js`, `career.js`, `plants.js`, `promptmaster.js`, `integrationSettings.js`, `car.js` и др.).
+- `api/` — API-клиенты поверх `apiAuthFetch` (`analytics.js`, `accounting.js`, `career.js`, `plants.js`, `promptmaster.js`, `integrationSettings.js`, `car.js`, `home.js` и др.).
 - `hooks/` — кастомные хуки.
 - `push/` — логика push‑подписки и общения с `/api/notifications`.
 - `utils/` — утилиты (`api.js` и т.д.).
@@ -136,8 +138,8 @@ AGENTS: Personal Portal
 Бэкенд (`backend/`)
 
 - `index.js` — точка входа: инициализация Express, регистрация маршрутов, cron‑задачи, начальная инициализация БД.
-- `routes/` — роутеры по доменам (`auth.js`, `admin.js`, `user.js`, `todos.js`, `todoLists.js`, `posts.js`, `vpn.js`, `vless.js`, `xray.js`, `notifications.js`, `actions.js`, `n8n.js`, `notes.js`, `accounting.js`, `plants.js`, `pests.js`, `diseases.js`, `medicines.js`, `problems.js`, `analytics.js`, `promptmaster.js`, `cheat.js`, `interview.js`, `tests.js`, `integrationSettings.js`, `career.js`, `car.js` и др.).
-- `routes/` — роутеры по доменам (`auth.js`, `admin.js`, `user.js`, `todos.js`, `todoLists.js`, `posts.js`, `vpn.js`, `vless.js`, `xray.js`, `notifications.js`, `actions.js`, `n8n.js`, `notes.js`, `accounting.js`, `plants.js`, `pests.js`, `diseases.js`, `medicines.js`, `problems.js`, `analytics.js`, `promptmaster.js`, `cheat.js`, `interview.js`, `tests.js`, `integrationSettings.js`, `career.js`, `car.js` и др.).
+- `routes/` — роутеры по доменам (`auth.js`, `admin.js`, `user.js`, `todos.js`, `todoLists.js`, `posts.js`, `vpn.js`, `vless.js`, `xray.js`, `notifications.js`, `actions.js`, `n8n.js`, `notes.js`, `accounting.js`, `plants.js`, `pests.js`, `diseases.js`, `medicines.js`, `problems.js`, `analytics.js`, `promptmaster.js`, `cheat.js`, `interview.js`, `tests.js`, `integrationSettings.js`, `career.js`, `car.js`, `home.js` и др.).
+- `routes/` — роутеры по доменам (`auth.js`, `admin.js`, `user.js`, `todos.js`, `todoLists.js`, `posts.js`, `vpn.js`, `vless.js`, `xray.js`, `notifications.js`, `actions.js`, `n8n.js`, `notes.js`, `accounting.js`, `plants.js`, `pests.js`, `diseases.js`, `medicines.js`, `problems.js`, `analytics.js`, `promptmaster.js`, `cheat.js`, `interview.js`, `tests.js`, `integrationSettings.js`, `career.js`, `car.js`, `home.js` и др.).
 - `controllers/` — контроллеры (например, `authController.js`, `authHandlers.js`).
 - `middleware/` — middleware авторизации и прав (`auth.js`).
 - `db/` — подключение к БД (`connect.js`), схемы (`*Schema.js`, `careerSchema.js`), миграции (`migrations/*.sql`).

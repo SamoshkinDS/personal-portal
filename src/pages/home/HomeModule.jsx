@@ -1,0 +1,840 @@
+import React from "react";
+import { motion } from "framer-motion";
+import toast from "react-hot-toast";
+import PageShell from "../../components/PageShell.jsx";
+import Modal from "../../components/Modal.jsx";
+import { homeApi } from "../../api/home.js";
+
+const blankContact = { id: null, title: "", phone: "", comments: "" };
+const blankCamera = { id: null, title: "", url: "", username: "", password: "" };
+const blankMeter = { id: null, title: "", code: "", meter_number: "" };
+
+function formatDate(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("ru-RU");
+}
+
+function formatNumber(value) {
+  if (value === null || value === undefined) return "-";
+  const num = Number(value);
+  if (Number.isNaN(num)) return "-";
+  return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 3 }).format(num);
+}
+
+export default function HomeModule() {
+  const [loading, setLoading] = React.useState(true);
+  const [company, setCompany] = React.useState(null);
+  const [contacts, setContacts] = React.useState([]);
+  const [cameras, setCameras] = React.useState([]);
+  const [meters, setMeters] = React.useState([]);
+  const [records, setRecords] = React.useState([]);
+
+  const [companyModalOpen, setCompanyModalOpen] = React.useState(false);
+  const [companyForm, setCompanyForm] = React.useState({
+    name: "",
+    phone: "",
+    emergency_phone: "",
+    email: "",
+    work_hours: "",
+    account_number: "",
+    office_address: "",
+    comments: "",
+  });
+  const [newCompanyFiles, setNewCompanyFiles] = React.useState([]);
+  const [removeFileIds, setRemoveFileIds] = React.useState([]);
+
+  const [contactModal, setContactModal] = React.useState({ open: false, data: blankContact });
+  const [cameraModal, setCameraModal] = React.useState({ open: false, data: blankCamera });
+  const [meterModal, setMeterModal] = React.useState({ open: false, data: blankMeter });
+  const [recordsModal, setRecordsModal] = React.useState({ open: false, meter: null });
+  const [recordsLoading, setRecordsLoading] = React.useState(false);
+
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const loadData = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const [companyData, contactsData, camerasData, metersData] = await Promise.all([
+        homeApi.getCompany(),
+        homeApi.listContacts(),
+        homeApi.listCameras(),
+        homeApi.listMeters(),
+      ]);
+      setCompany(companyData.company || null);
+      setContacts(contactsData.items || []);
+      setCameras(camerasData.items || []);
+      setMeters(metersData.items || []);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Не удалось загрузить раздел Квартира");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const openCompanyEditor = () => {
+    setCompanyForm({
+      name: company?.name || "",
+      phone: company?.phone || "",
+      emergency_phone: company?.emergency_phone || "",
+      email: company?.email || "",
+      work_hours: company?.work_hours || "",
+      account_number: company?.account_number || "",
+      office_address: company?.office_address || "",
+      comments: company?.comments || "",
+    });
+    setNewCompanyFiles([]);
+    setRemoveFileIds([]);
+    setCompanyModalOpen(true);
+  };
+
+  const handleSaveCompany = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      Object.entries(companyForm).forEach(([key, value]) => fd.append(key, value || ""));
+      removeFileIds.forEach((id) => fd.append("removeFileIds", id));
+      newCompanyFiles.forEach((file) => fd.append("files", file));
+      const data = await homeApi.saveCompany(fd);
+      setCompany(data.company || null);
+      toast.success("Компания обновлена");
+      setCompanyModalOpen(false);
+    } catch (err) {
+      toast.error(err.message || "Не удалось сохранить данные");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveContact = async (e) => {
+    e.preventDefault();
+    const payload = contactModal.data;
+    if (!payload.title.trim()) {
+      toast.error("Название обязательно");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (payload.id) {
+        await homeApi.updateContact(payload.id, payload);
+        toast.success("Контакт обновлён");
+      } else {
+        await homeApi.createContact(payload);
+        toast.success("Контакт добавлен");
+      }
+      setContactModal({ open: false, data: blankContact });
+      await loadData();
+    } catch (err) {
+      toast.error(err.message || "Не удалось сохранить контакт");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteContact = async (item) => {
+    if (!window.confirm("Удалить контакт?")) return;
+    try {
+      await homeApi.deleteContact(item.id);
+      toast.success("Контакт удалён");
+      await loadData();
+    } catch (err) {
+      toast.error(err.message || "Не удалось удалить контакт");
+    }
+  };
+
+  const handleSaveCamera = async (e) => {
+    e.preventDefault();
+    const payload = cameraModal.data;
+    if (!payload.title.trim()) {
+      toast.error("Название камеры обязательно");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (payload.id) {
+        await homeApi.updateCamera(payload.id, payload);
+        toast.success("Камера обновлена");
+      } else {
+        await homeApi.createCamera(payload);
+        toast.success("Камера добавлена");
+      }
+      setCameraModal({ open: false, data: blankCamera });
+      await loadData();
+    } catch (err) {
+      toast.error(err.message || "Не удалось сохранить камеру");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteCamera = async (item) => {
+    if (!window.confirm("Удалить камеру?")) return;
+    try {
+      await homeApi.deleteCamera(item.id);
+      toast.success("Камера удалена");
+      await loadData();
+    } catch (err) {
+      toast.error(err.message || "Не удалось удалить камеру");
+    }
+  };
+
+  const handleSaveMeter = async (e) => {
+    e.preventDefault();
+    const payload = meterModal.data;
+    if (!payload.title.trim()) {
+      toast.error("Название счётчика обязательно");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const body = { title: payload.title, code: payload.code, meterNumber: payload.meter_number };
+      if (payload.id) {
+        await homeApi.updateMeter(payload.id, body);
+        toast.success("Счётчик обновлён");
+      } else {
+        await homeApi.createMeter(body);
+        toast.success("Счётчик добавлен");
+      }
+      setMeterModal({ open: false, data: blankMeter });
+      await loadData();
+    } catch (err) {
+      toast.error(err.message || "Не удалось сохранить счётчик");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteMeter = async (item) => {
+    if (!window.confirm("Удалить счётчик и его историю?")) return;
+    try {
+      await homeApi.deleteMeter(item.id);
+      toast.success("Счётчик удалён");
+      await loadData();
+    } catch (err) {
+      toast.error(err.message || "Не удалось удалить счётчик");
+    }
+  };
+
+  const openRecords = async (meter) => {
+    setRecordsModal({ open: true, meter });
+    setRecords([]);
+    setRecordsLoading(true);
+    try {
+      const data = await homeApi.listMeterRecords(meter.id);
+      setRecords(data.items || []);
+    } catch (err) {
+      toast.error(err.message || "Не удалось загрузить историю");
+    } finally {
+      setRecordsLoading(false);
+    }
+  };
+
+  const handleAddRecord = async (e) => {
+    e.preventDefault();
+    if (!recordsModal.meter) return;
+    const form = new FormData(e.target);
+    const value = form.get("value");
+    const date = form.get("date");
+    if (!value) {
+      toast.error("Укажите показание");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await homeApi.createMeterRecord(recordsModal.meter.id, { value, date });
+      toast.success("Показание добавлено");
+      const data = await homeApi.listMeterRecords(recordsModal.meter.id);
+      setRecords(data.items || []);
+      await loadData();
+      e.target.reset();
+    } catch (err) {
+      toast.error(err.message || "Не удалось добавить показание");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteRecord = async (record) => {
+    if (!window.confirm("Удалить показание?")) return;
+    try {
+      await homeApi.deleteMeterRecord(record.id);
+      toast.success("Показание удалено");
+      if (recordsModal.meter) {
+        const data = await homeApi.listMeterRecords(recordsModal.meter.id);
+        setRecords(data.items || []);
+      }
+      await loadData();
+    } catch (err) {
+      toast.error(err.message || "Не удалось удалить показание");
+    }
+  };
+
+  const meterCards = meters.map((meter) => {
+    const last = meter.lastRecord;
+    const consumption = last?.diff !== null && last?.diff !== undefined ? formatNumber(last.diff) : null;
+    return (
+      <motion.div
+        layout
+        key={meter.id}
+        whileHover={{ y: -4 }}
+        className="flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm transition dark:border-slate-700/60 dark:bg-slate-900/70"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{meter.code || "счётчик"}</div>
+            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{meter.title}</div>
+            {meter.meter_number && <div className="text-xs text-slate-500 dark:text-slate-400">№ {meter.meter_number}</div>}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setMeterModal({ open: true, data: { ...meter, meter_number: meter.meter_number || "" } })}
+              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-100"
+            >
+              Редактировать
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeleteMeter(meter)}
+              className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
+            >
+              Удалить
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            Последнее: <span className="font-semibold">{formatNumber(last?.value)}</span>
+          </div>
+          <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            Дата: <span className="font-semibold">{formatDate(last?.reading_date)}</span>
+          </div>
+          <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            Расход: <span className="font-semibold">{consumption ?? "-"}</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => openRecords(meter)}
+            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:-translate-y-0.5 hover:bg-indigo-700 transition dark:bg-indigo-500 dark:hover:bg-indigo-400"
+          >
+            История
+          </button>
+        </div>
+      </motion.div>
+    );
+  });
+
+  return (
+    <PageShell title="Квартира" description="Управляющая компания, важные телефоны, камеры и счётчики" contentClassName="bg-transparent">
+      {loading ? (
+        <div className="rounded-3xl border border-slate-200/70 bg-white/80 p-6 text-sm text-slate-500 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70">
+          Загружаем данные...
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+            <motion.div
+              layout
+              className="flex flex-col gap-4 overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50 p-6 shadow-sm ring-1 ring-blue-500/5 dark:border-slate-700/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Управляющая компания</p>
+                  <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">{company?.name || "—"}</h2>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={openCompanyEditor}
+                    className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:-translate-y-0.5 hover:bg-indigo-700 transition dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                  >
+                    Редактировать
+                  </button>
+                </div>
+              </div>
+              <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <InfoCell label="Телефон" value={company?.phone} />
+                <InfoCell label="Аварийный" value={company?.emergency_phone} />
+                <InfoCell label="Почта" value={company?.email} />
+                <InfoCell label="График" value={company?.work_hours} />
+                <InfoCell label="Лицевой счёт" value={company?.account_number} />
+                <InfoCell label="Адрес офиса" value={company?.office_address} />
+              </dl>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-sm text-slate-700 dark:border-slate-700/60 dark:bg-slate-800/70 dark:text-slate-200">
+                {company?.comments || "Комментарии не добавлены"}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {company?.files?.length ? (
+                  company.files.map((file) => (
+                    <a
+                      key={file.id}
+                      href={file.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    >
+                      📄 {file.file_name || "Документ"}
+                    </a>
+                  ))
+                ) : (
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Нет приложенных файлов</div>
+                )}
+              </div>
+            </motion.div>
+
+            <motion.div
+              layout
+              className="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-6 shadow-sm ring-1 ring-slate-200/50 dark:border-slate-700/60 dark:bg-slate-900/70"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Телефоны</p>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Важные контакты</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setContactModal({ open: true, data: blankContact })}
+                  className="rounded-full bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow transition hover:-translate-y-0.5 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                >
+                  Добавить
+                </button>
+              </div>
+              <div className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+                {contacts.length === 0 && <div className="py-4 text-sm text-slate-500 dark:text-slate-400">Контактов пока нет</div>}
+                {contacts.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 py-3">
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.title}</div>
+                      <div className="text-sm text-slate-600 dark:text-slate-300">{item.phone || "—"}</div>
+                      {item.comments && <div className="text-xs text-slate-500 dark:text-slate-400">{item.comments}</div>}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setContactModal({ open: true, data: { ...item } })}
+                        className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-100"
+                      >
+                        Править
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteContact(item)}
+                        className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+            <motion.div
+              layout
+              className="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-6 shadow-sm ring-1 ring-slate-200/50 dark:border-slate-700/60 dark:bg-slate-900/70"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Счётчики</p>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Вода и учёт</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMeterModal({ open: true, data: blankMeter })}
+                  className="rounded-full bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow transition hover:-translate-y-0.5 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                >
+                  Новый
+                </button>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">{meterCards}</div>
+            </motion.div>
+
+            <motion.div
+              layout
+              className="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-6 shadow-sm ring-1 ring-slate-200/50 dark:border-slate-700/60 dark:bg-slate-900/70"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Камеры</p>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Двор и подъезд</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCameraModal({ open: true, data: blankCamera })}
+                  className="rounded-full bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow transition hover:-translate-y-0.5 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                >
+                  Добавить
+                </button>
+              </div>
+              <div className="flex flex-col gap-3">
+                {cameras.length === 0 && <div className="text-sm text-slate-500 dark:text-slate-400">Камеры не добавлены</div>}
+                {cameras.map((cam) => (
+                  <div
+                    key={cam.id}
+                    className="flex items-start justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/60"
+                  >
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{cam.title}</div>
+                      <div className="break-all text-xs text-slate-500 dark:text-slate-400">{cam.url}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {cam.username && <span>Логин: {cam.username} </span>}
+                        {cam.password && <span>Пароль: {cam.password}</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {cam.url && (
+                        <a
+                          href={cam.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow transition hover:-translate-y-0.5 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                        >
+                          Открыть камеру
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setCameraModal({ open: true, data: { ...cam } })}
+                        className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-100"
+                      >
+                        Править
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCamera(cam)}
+                        className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </section>
+        </div>
+      )}
+
+      <Modal open={companyModalOpen} onClose={() => setCompanyModalOpen(false)} title="Управляющая компания" maxWidth="max-w-4xl">
+        <form className="space-y-4" onSubmit={handleSaveCompany}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input label="Название" value={companyForm.name} onChange={(v) => setCompanyForm((prev) => ({ ...prev, name: v }))} required />
+            <Input label="Телефон" value={companyForm.phone} onChange={(v) => setCompanyForm((prev) => ({ ...prev, phone: v }))} />
+            <Input
+              label="Аварийный телефон"
+              value={companyForm.emergency_phone}
+              onChange={(v) => setCompanyForm((prev) => ({ ...prev, emergency_phone: v }))}
+            />
+            <Input label="Почта" value={companyForm.email} onChange={(v) => setCompanyForm((prev) => ({ ...prev, email: v }))} />
+            <Input label="График работы" value={companyForm.work_hours} onChange={(v) => setCompanyForm((prev) => ({ ...prev, work_hours: v }))} />
+            <Input
+              label="Лицевой счёт"
+              value={companyForm.account_number}
+              onChange={(v) => setCompanyForm((prev) => ({ ...prev, account_number: v }))}
+            />
+            <Input
+              label="Адрес офиса"
+              value={companyForm.office_address}
+              onChange={(v) => setCompanyForm((prev) => ({ ...prev, office_address: v }))}
+            />
+          </div>
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-800 dark:text-slate-100">Комментарии</span>
+            <textarea
+              rows={3}
+              value={companyForm.comments}
+              onChange={(e) => setCompanyForm((prev) => ({ ...prev, comments: e.target.value }))}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </label>
+
+          <div className="space-y-3">
+            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Файлы</div>
+            <div className="flex flex-wrap gap-2">
+              {company?.files?.length ? (
+                company.files.map((file) => {
+                  const marked = removeFileIds.includes(file.id);
+                  return (
+                    <button
+                      type="button"
+                      key={file.id}
+                      onClick={() =>
+                        setRemoveFileIds((prev) => (marked ? prev.filter((id) => id !== file.id) : [...prev, file.id]))
+                      }
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                        marked
+                          ? "border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-700/60 dark:bg-rose-900/40 dark:text-rose-200"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      }`}
+                    >
+                      {marked ? "Убрать" : "Оставить"} · {file.file_name || "Документ"}
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="text-xs text-slate-500 dark:text-slate-400">Нет файлов</div>
+              )}
+            </div>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-semibold text-slate-800 dark:text-slate-100">Прикрепить новые файлы</span>
+              <input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.docx"
+                multiple
+                onChange={(e) => setNewCompanyFiles(Array.from(e.target.files || []))}
+                className="text-sm text-slate-700 dark:text-slate-200"
+              />
+              {newCompanyFiles.length > 0 && (
+                <div className="text-xs text-slate-500 dark:text-slate-400">{newCompanyFiles.length} файл(ов) будет загружено</div>
+              )}
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setCompanyModalOpen(false)}
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-100"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            >
+              {submitting ? "Сохраняем..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={contactModal.open} onClose={() => setContactModal({ open: false, data: blankContact })} title="Контакт" maxWidth="max-w-md">
+        <form className="space-y-4" onSubmit={handleSaveContact}>
+          <Input
+            label="Название"
+            value={contactModal.data.title}
+            onChange={(v) => setContactModal((prev) => ({ ...prev, data: { ...prev.data, title: v } }))}
+            required
+          />
+          <Input label="Телефон" value={contactModal.data.phone} onChange={(v) => setContactModal((prev) => ({ ...prev, data: { ...prev.data, phone: v } }))} />
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-800 dark:text-slate-100">Комментарии</span>
+            <textarea
+              rows={3}
+              value={contactModal.data.comments}
+              onChange={(e) => setContactModal((prev) => ({ ...prev, data: { ...prev.data, comments: e.target.value } }))}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </label>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setContactModal({ open: false, data: blankContact })}
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-100"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            >
+              {submitting ? "Сохраняем..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={cameraModal.open} onClose={() => setCameraModal({ open: false, data: blankCamera })} title="Камера" maxWidth="max-w-md">
+        <form className="space-y-4" onSubmit={handleSaveCamera}>
+          <Input
+            label="Название зоны"
+            value={cameraModal.data.title}
+            onChange={(v) => setCameraModal((prev) => ({ ...prev, data: { ...prev.data, title: v } }))}
+            required
+          />
+          <Input
+            label="URL просмотра"
+            value={cameraModal.data.url}
+            onChange={(v) => setCameraModal((prev) => ({ ...prev, data: { ...prev.data, url: v } }))}
+            placeholder="https://..."
+          />
+          <Input
+            label="Логин"
+            value={cameraModal.data.username}
+            onChange={(v) => setCameraModal((prev) => ({ ...prev, data: { ...prev.data, username: v } }))}
+          />
+          <Input
+            label="Пароль"
+            value={cameraModal.data.password}
+            onChange={(v) => setCameraModal((prev) => ({ ...prev, data: { ...prev.data, password: v } }))}
+          />
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setCameraModal({ open: false, data: blankCamera })}
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-100"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            >
+              {submitting ? "Сохраняем..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={meterModal.open} onClose={() => setMeterModal({ open: false, data: blankMeter })} title="Счётчик" maxWidth="max-w-md">
+        <form className="space-y-4" onSubmit={handleSaveMeter}>
+          <Input
+            label="Название"
+            value={meterModal.data.title}
+            onChange={(v) => setMeterModal((prev) => ({ ...prev, data: { ...prev.data, title: v } }))}
+            required
+          />
+          <Input
+            label="Код (hvs1, gvs2...)"
+            value={meterModal.data.code || ""}
+            onChange={(v) => setMeterModal((prev) => ({ ...prev, data: { ...prev.data, code: v } }))}
+            placeholder="hvs1"
+          />
+          <Input
+            label="Номер счётчика"
+            value={meterModal.data.meter_number || ""}
+            onChange={(v) => setMeterModal((prev) => ({ ...prev, data: { ...prev.data, meter_number: v } }))}
+            placeholder="серийный номер"
+          />
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setMeterModal({ open: false, data: blankMeter })}
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-100"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            >
+              {submitting ? "Сохраняем..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={recordsModal.open}
+        onClose={() => {
+          setRecordsModal({ open: false, meter: null });
+          setRecords([]);
+        }}
+        title={recordsModal.meter ? `История · ${recordsModal.meter.title}` : "История"}
+        maxWidth="max-w-3xl"
+      >
+        <div className="space-y-4">
+          <form className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end" onSubmit={handleAddRecord}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-semibold text-slate-800 dark:text-slate-100">Дата</span>
+                <input
+                  type="date"
+                  name="date"
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-semibold text-slate-800 dark:text-slate-100">Показание</span>
+                <input
+                  type="number"
+                  step="0.001"
+                  name="value"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  required
+                />
+              </label>
+            </div>
+            <button
+              type="submit"
+              disabled={submitting || !recordsModal.meter}
+              className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            >
+              Добавить
+            </button>
+          </form>
+
+          {recordsLoading ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">Загружаем историю...</div>
+          ) : records.length === 0 ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">Показаний пока нет</div>
+          ) : (
+            <div className="space-y-2">
+              {records.map((rec) => (
+                <div
+                  key={rec.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-800/60"
+                >
+                  <div className="flex flex-1 flex-wrap items-center gap-3">
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">{formatNumber(rec.value)}</span>
+                    <span className="text-slate-500 dark:text-slate-400">{formatDate(rec.reading_date)}</span>
+                    <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-200">
+                      Δ {rec.diff !== null && rec.diff !== undefined ? formatNumber(rec.diff) : "-"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteRecord(rec)}
+                    className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                  >
+                    Удалить
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+    </PageShell>
+  );
+}
+
+function Input({ label, value, onChange, placeholder = "", required = false }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="font-semibold text-slate-800 dark:text-slate-100">{label}</span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+      />
+    </label>
+  );
+}
+
+function InfoCell({ label, value }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-sm dark:border-slate-700/60 dark:bg-slate-800/70">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-slate-900 dark:text-slate-100">{value || "—"}</span>
+    </div>
+  );
+}

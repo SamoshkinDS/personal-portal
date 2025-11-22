@@ -47,6 +47,7 @@ const AdminUsers = React.lazy(() => import("./pages/admin/Users.jsx"));
 const NotFound = React.lazy(() => import("./pages/NotFound.jsx"));
 const Home = React.lazy(() => import("./pages/Home.jsx"));
 const CarPage = React.lazy(() => import("./pages/Car.jsx"));
+const HomeModule = React.lazy(() => import("./pages/home/HomeModule.jsx"));
 const Outline = React.lazy(() => import("./pages/vpn/Outline.jsx"));
 const Vless = React.lazy(() => import("./pages/vpn/Vless.jsx"));
 const VlessGuide = React.lazy(() => import("./pages/vpn/VlessGuide.jsx"));
@@ -241,6 +242,14 @@ export const router = createBrowserRouter(
           element={
             <RouteTransition disable>
               <Home />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="home"
+          element={
+            <RouteTransition>
+              <HomeModule />
             </RouteTransition>
           }
         />
