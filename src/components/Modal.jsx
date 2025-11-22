@@ -2,7 +2,15 @@
 import React from "react";
 import { createPortal } from "react-dom";
 
-export default function Modal({ open, onClose, title, children, maxWidth = "max-w-2xl" }) {
+export default function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  maxWidth = "max-w-2xl",
+  footer = null,
+  bodyClassName = "",
+}) {
   const [mounted, setMounted] = React.useState(false);
   const [shouldRender, setShouldRender] = React.useState(open);
 
@@ -36,9 +44,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
   if (!mounted || !shouldRender) return null;
 
   return createPortal(
-    <div
-      className={`fixed inset-0 z-40 ${open ? "pointer-events-auto" : "pointer-events-none"}`}
-    >
+    <div className={`fixed inset-0 z-40 ${open ? "pointer-events-auto" : "pointer-events-none"}`}>
       <div
         className={`absolute inset-0 bg-slate-900/50 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"}`}
         onClick={onClose}
@@ -60,12 +66,21 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-slate-800"
               aria-label="Закрыть"
             >
-              ✕
+              ×
             </button>
           </div>
-          <div className="custom-scrollbar overflow-y-auto pr-1 text-sm text-gray-700 dark:text-gray-300">
+          <div
+            className={`custom-scrollbar pr-1 text-sm text-gray-700 dark:text-gray-300 ${
+              footer ? "flex-1 overflow-y-auto" : "overflow-y-auto"
+            } ${bodyClassName}`}
+          >
             {children}
           </div>
+          {footer ? (
+            <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
+              {footer}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>,

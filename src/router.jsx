@@ -10,6 +10,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { Toaster } from "react-hot-toast";
+import { NavigationPreferencesProvider } from "./context/NavigationPreferencesContext.jsx";
 
 import Sidebar from "./components/Sidebar.jsx";
 import PageLoader from "./components/PageLoader.jsx";
@@ -172,14 +173,16 @@ function PrivateLayout() {
   }
 
   return (
-    <div className="app-layout flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 text-gray-900 transition-colors duration-500 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 dark:text-gray-100">
-      <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
-      <div className="app-layout__content flex min-w-0 flex-1 flex-col transition-colors duration-500">
-        <AnimatePresence mode="wait">
-          <Outlet key={location.pathname} />
-        </AnimatePresence>
+    <NavigationPreferencesProvider>
+      <div className="app-layout flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 text-gray-900 transition-colors duration-500 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 dark:text-gray-100">
+        <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
+        <div className="app-layout__content flex min-w-0 flex-1 flex-col transition-colors duration-500">
+          <AnimatePresence mode="wait">
+            <Outlet key={location.pathname} />
+          </AnimatePresence>
+        </div>
       </div>
-    </div>
+    </NavigationPreferencesProvider>
   );
 }
 

@@ -421,6 +421,14 @@ if (ACCOUNTING_JOBS_ENABLED) {
       );
     `);
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS navigation_preferences (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        layout JSONB DEFAULT '[]',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS accounts (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -467,6 +475,12 @@ if (ACCOUNTING_JOBS_ENABLED) {
           FOR EACH ROW
           EXECUTE FUNCTION set_updated_at();
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'navigation_preferences_set_updated_at') THEN
+          CREATE TRIGGER navigation_preferences_set_updated_at
+          BEFORE UPDATE ON navigation_preferences
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'accounts_set_updated_at') THEN
           CREATE TRIGGER accounts_set_updated_at
           BEFORE UPDATE ON accounts
@@ -510,6 +524,11 @@ if (ACCOUNTING_JOBS_ENABLED) {
       SELECT id FROM users
       ON CONFLICT (user_id) DO NOTHING;
     `);
+    await pool.query(`
+      INSERT INTO navigation_preferences (user_id)
+      SELECT id FROM users
+      ON CONFLICT (user_id) DO NOTHING;
+    `);
     await ensureCareCatalogSchema();
     await ensurePlantsSchema();
     await ensureAnalyticsSchema();
@@ -523,7 +542,7 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureHomeSchema();
     await ensureRegistrationRequestsSchema();
     console.log(
-      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home"
+      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, navigation_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home"
     );
   } catch (err) {
     console.error("DB init error", err);
