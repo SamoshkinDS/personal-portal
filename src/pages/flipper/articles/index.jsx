@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import PageShell from "../../../components/PageShell.jsx";
 import { FlipperArticleCard } from "../../../components/flipper/Cards.jsx";
 import { listArticles, listCategories, listFirmwares } from "../../../api/flipper.js";
+import { FlipperHeader } from "../../../components/flipper/ui.jsx";
 
 export default function FlipperArticlesList() {
   const [items, setItems] = useState([]);
@@ -27,9 +28,15 @@ export default function FlipperArticlesList() {
 
   return (
     <PageShell title="Flipper Zero / Все статьи" contentClassName="space-y-4">
-      <Link to="/flipper" className="text-sm text-indigo-600 hover:underline dark:text-indigo-300">
-        ← Назад в раздел Flipper Zero
-      </Link>
+      <FlipperHeader
+        title="Все статьи"
+        subtitle="Функции, прошивки, модули, гайды и уязвимости — единый список."
+        type="basic"
+        breadcrumbs={[
+          { label: "Flipper Zero", href: "/flipper" },
+          { label: "Статьи" },
+        ]}
+      />
       <div className="flex flex-wrap gap-2">
         <select
           value={filters.category_id}

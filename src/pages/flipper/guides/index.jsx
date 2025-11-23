@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import PageShell from "../../../components/PageShell.jsx";
 import { FlipperGuideCard } from "../../../components/flipper/Cards.jsx";
 import { listArticles } from "../../../api/flipper.js";
+import { FlipperHeader } from "../../../components/flipper/ui.jsx";
 
 export default function FlipperGuidesList() {
   const [items, setItems] = useState([]);
@@ -18,9 +19,15 @@ export default function FlipperGuidesList() {
 
   return (
     <PageShell title="Flipper Zero / Гайды" contentClassName="space-y-4">
-      <Link to="/flipper" className="text-sm text-indigo-600 hover:underline dark:text-indigo-300">
-        ← Назад в раздел Flipper Zero
-      </Link>
+      <FlipperHeader
+        title="Гайды"
+        subtitle="Сценарии проверки: BLE, Sub-GHz, RFID/iButton, IR. Все статьи типа guide_scenario."
+        type="guide"
+        breadcrumbs={[
+          { label: "Flipper Zero", href: "/flipper" },
+          { label: "Гайды" },
+        ]}
+      />
       {loading ? (
         <div className="text-sm text-slate-600 dark:text-slate-300">Загрузка...</div>
       ) : (

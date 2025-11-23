@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import PageShell from "../../../components/PageShell.jsx";
 import { FlipperVulnCard } from "../../../components/flipper/Cards.jsx";
 import { listArticles } from "../../../api/flipper.js";
+import { FlipperHeader } from "../../../components/flipper/ui.jsx";
 
 export default function FlipperVulnsList() {
   const [items, setItems] = useState([]);
@@ -18,9 +19,15 @@ export default function FlipperVulnsList() {
 
   return (
     <PageShell title="Flipper Zero / Уязвимости" contentClassName="space-y-4">
-      <Link to="/flipper" className="text-sm text-indigo-600 hover:underline dark:text-indigo-300">
-        ← Назад в раздел Flipper Zero
-      </Link>
+      <FlipperHeader
+        title="Уязвимости"
+        subtitle="Записи с типом vuln_check: сценарии проверки и защитные меры."
+        type="vuln"
+        breadcrumbs={[
+          { label: "Flipper Zero", href: "/flipper" },
+          { label: "Уязвимости" },
+        ]}
+      />
       {loading ? (
         <div className="text-sm text-slate-600 dark:text-slate-300">Загрузка...</div>
       ) : (

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import PageShell from "../../../components/PageShell.jsx";
 import { FlipperModuleCard } from "../../../components/flipper/Cards.jsx";
 import { listModules, listFirmwares, listCategories } from "../../../api/flipper.js";
+import { FlipperHeader } from "../../../components/flipper/ui.jsx";
 
 export default function FlipperModulesList() {
   const [items, setItems] = useState([]);
@@ -27,9 +28,15 @@ export default function FlipperModulesList() {
 
   return (
     <PageShell title="Flipper Zero / Модули" contentClassName="space-y-4">
-      <Link to="/flipper" className="text-sm text-indigo-600 hover:underline dark:text-indigo-300">
-        ← Назад в раздел Flipper Zero
-      </Link>
+      <FlipperHeader
+        title="Модули"
+        subtitle="Инструменты и плагины для Flipper Zero с фильтром по прошивкам и категориям."
+        type="module"
+        breadcrumbs={[
+          { label: "Flipper Zero", href: "/flipper" },
+          { label: "Модули" },
+        ]}
+      />
 
       <div className="flex flex-wrap gap-2">
         <select

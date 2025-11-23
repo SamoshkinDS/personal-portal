@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import PageShell from "../../../components/PageShell.jsx";
 import { FlipperFirmwareCard } from "../../../components/flipper/Cards.jsx";
 import { listFirmwares } from "../../../api/flipper.js";
+import { FlipperHeader } from "../../../components/flipper/ui.jsx";
 
 export default function FlipperFirmwareList() {
   const [items, setItems] = useState([]);
@@ -18,9 +19,15 @@ export default function FlipperFirmwareList() {
 
   return (
     <PageShell title="Flipper Zero / Кастомные прошивки" contentClassName="space-y-4">
-      <Link to="/flipper" className="text-sm text-indigo-600 hover:underline dark:text-indigo-300">
-        ← Назад в раздел Flipper Zero
-      </Link>
+      <FlipperHeader
+        title="Кастомные прошивки"
+        subtitle="Unleashed, Marauder, Momentum, BunnyLoader — все доступные сборки."
+        type="firmware"
+        breadcrumbs={[
+          { label: "Flipper Zero", href: "/flipper" },
+          { label: "Кастомные прошивки" },
+        ]}
+      />
       {loading ? (
         <div className="text-sm text-slate-600 dark:text-slate-300">Загрузка...</div>
       ) : (
