@@ -57,6 +57,7 @@ const CONTEXT_SECTIONS = [
       { title: "Дашборд", link: "/accounting", icon: ChartIcon },
       { title: "Счета", link: "/accounting/accounts", icon: WalletIcon },
       { title: "Платежи", link: "/accounting/payments", icon: PaymentIcon },
+      { title: "Долги", link: "/accounting/debts", icon: PaymentIcon },
       { title: "Транзакции", link: "/accounting/transactions", icon: TransferIcon },
       { title: "Доходы", link: "/accounting/incomes", icon: IncomeIcon },
       { title: "Категории", link: "/accounting/categories", icon: TagIcon },

@@ -48,6 +48,7 @@ const Settings = React.lazy(() => import("./pages/Settings.jsx"));
 const AccountingDashboard = React.lazy(() => import("./pages/accounting/Dashboard.jsx"));
 const AccountingAccounts = React.lazy(() => import("./pages/accounting/Accounts.jsx"));
 const AccountingPayments = React.lazy(() => import("./pages/accounting/Payments.jsx"));
+const AccountingDebts = React.lazy(() => import("./pages/accounting/Debts.jsx"));
 const AccountingTransactions = React.lazy(() => import("./pages/accounting/Transactions.jsx"));
 const AccountingIncomes = React.lazy(() => import("./pages/accounting/Incomes.jsx"));
 const AccountingCategories = React.lazy(() => import("./pages/accounting/Categories.jsx"));
@@ -739,6 +740,16 @@ export const router = createBrowserRouter(
             <PermissionGate check={canAccountingEdit}>
               <RouteTransition>
                 <AccountingPayments />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="accounting/debts"
+          element={
+            <PermissionGate check={canAccountingEdit}>
+              <RouteTransition>
+                <AccountingDebts />
               </RouteTransition>
             </PermissionGate>
           }

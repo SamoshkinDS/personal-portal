@@ -327,6 +327,11 @@ if (ACCOUNTING_JOBS_ENABLED) {
       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     `);
     await pool.query(`
+      DO $$ BEGIN
+        CREATE TYPE debt_direction AS ENUM ('borrowed','lent');
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    `);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS categories (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -412,6 +417,41 @@ if (ACCOUNTING_JOBS_ENABLED) {
       CREATE INDEX IF NOT EXISTS incomes_user_next_idx ON incomes(user_id, next_date);
     `);
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS accounting_debts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        direction debt_direction NOT NULL,
+        counterparty TEXT NOT NULL,
+        bank_name TEXT,
+        description TEXT,
+        principal_amount NUMERIC(14,2) NOT NULL,
+        currency TEXT NOT NULL DEFAULT '${(process.env.ACCOUNTING_BASE_CURRENCY || "RUB").toUpperCase()}',
+        interest_rate_apy NUMERIC(6,3),
+        start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        due_date DATE,
+        is_closed BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS accounting_debts_user_idx ON accounting_debts(user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS accounting_debts_status_idx ON accounting_debts(user_id, is_closed);
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS accounting_debt_payments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        debt_id UUID NOT NULL REFERENCES accounting_debts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        payment_date DATE NOT NULL,
+        principal_paid NUMERIC(14,2) NOT NULL DEFAULT 0,
+        interest_paid NUMERIC(14,2) NOT NULL DEFAULT 0,
+        amount_total NUMERIC(14,2) NOT NULL DEFAULT 0,
+        comment TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS accounting_debt_payments_debt_idx ON accounting_debt_payments(debt_id, payment_date DESC);
+    `);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS dashboard_preferences (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         show_kpis BOOLEAN DEFAULT TRUE,
@@ -490,6 +530,12 @@ if (ACCOUNTING_JOBS_ENABLED) {
           FOR EACH ROW
           EXECUTE FUNCTION set_updated_at();
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'accounting_debts_set_updated_at') THEN
+          CREATE TRIGGER accounting_debts_set_updated_at
+          BEFORE UPDATE ON accounting_debts
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        END IF;
       END $$;
     `);
     await pool.query(`
@@ -546,7 +592,7 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureRegistrationRequestsSchema();
     await ensureFlipperSchema();
     console.log(
-      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, dashboard_preferences, navigation_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home, flipper"
+      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, accounting_debts, dashboard_preferences, navigation_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home, flipper"
     );
   } catch (err) {
     console.error("DB init error", err);

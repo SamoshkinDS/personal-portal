@@ -81,6 +81,18 @@ export const accountingApi = {
   updateAccount: (id, payload) =>
     request(`/api/accounting/accounts/${id}`, { method: "PATCH", body: payload }),
   deleteAccount: (id) => request(`/api/accounting/accounts/${id}`, { method: "DELETE" }),
+
+  listDebts: () => request("/api/accounting/debts"),
+  getDebt: (id) => request(`/api/accounting/debts/${id}`),
+  createDebt: (payload) => request("/api/accounting/debts", { method: "POST", body: payload }),
+  updateDebt: (id, payload) =>
+    request(`/api/accounting/debts/${id}`, { method: "PATCH", body: payload }),
+  deleteDebt: (id) => request(`/api/accounting/debts/${id}`, { method: "DELETE" }),
+  addDebtPayment: (id, payload, options = {}) =>
+    request(`/api/accounting/debts/${id}/payments`, {
+      method: "POST",
+      body: { ...payload, dry_run: options.preview },
+    }),
 };
 
 

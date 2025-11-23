@@ -222,6 +222,7 @@ export const DEFAULT_NAV_ITEMS = [
       { id: "accounting-dashboard", path: "/accounting", label: "Дашборд", icon: NAV_ICONS.chart },
       { id: "accounting-accounts", path: "/accounting/accounts", label: "Счета", icon: NAV_ICONS.doc },
       { id: "accounting-payments", path: "/accounting/payments", label: "Платежи", icon: NAV_ICONS.doc },
+      { id: "accounting-debts", path: "/accounting/debts", label: "Долги", icon: NAV_ICONS.doc },
       { id: "accounting-transactions", path: "/accounting/transactions", label: "Транзакции", icon: NAV_ICONS.doc },
       { id: "accounting-incomes", path: "/accounting/incomes", label: "Доходы", icon: NAV_ICONS.doc },
       { id: "accounting-categories", path: "/accounting/categories", label: "Категории", icon: NAV_ICONS.doc },

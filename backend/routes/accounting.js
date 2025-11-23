@@ -51,6 +51,7 @@ const SYSTEM_CATEGORY_SEEDS = [
 const DATE_REGEXP = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_ERROR = { message: "Invalid identifier" };
 const MAX_PAGE_SIZE = 100;
+const DEBT_DIRECTIONS = new Set(["borrowed", "lent"]);
 
 const parseBool = (value) => {
   if (typeof value === "boolean") return value;
@@ -69,6 +70,15 @@ const toAmount = (value) => {
 };
 
 const round2 = (value) => Math.round(value * 100) / 100;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function daysBetween(from, to) {
+  const start = startOfDay(from).getTime();
+  const end = startOfDay(to).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+  return Math.max(0, Math.round((end - start) / DAY_MS));
+}
 
 function pickAllowed(payload, allowed) {
   const result = {};
@@ -152,6 +162,83 @@ async function listAccountsWithBalance(userId, accountId = null) {
 async function getAccountBalance(userId, accountId) {
   const rows = await listAccountsWithBalance(userId, accountId);
   return rows[0]?.actual_balance ?? null;
+}
+
+async function getDebtById(userId, debtId) {
+  if (!debtId || !isValidUuid(debtId)) return null;
+  const q = await pool.query(
+    `SELECT * FROM accounting_debts WHERE id = $1 AND user_id = $2 LIMIT 1`,
+    [debtId, userId]
+  );
+  return q.rows[0] || null;
+}
+
+async function listDebtPayments(userId, debtId) {
+  const q = await pool.query(
+    `SELECT * FROM accounting_debt_payments WHERE user_id = $1 AND debt_id = $2 ORDER BY payment_date ASC, created_at ASC`,
+    [userId, debtId]
+  );
+  return q.rows;
+}
+
+function computeDebtState(debt, payments = [], asOfDate = new Date()) {
+  const rate = Number(debt?.interest_rate_apy) || 0;
+  const sorted = [...payments].sort((a, b) => {
+    const aDate = new Date(a.payment_date || a.created_at || 0);
+    const bDate = new Date(b.payment_date || b.created_at || 0);
+    return aDate - bDate;
+  });
+  let outstandingPrincipal = Number(debt?.principal_amount) || 0;
+  let totalInterestAccrued = 0;
+  let totalInterestPaid = 0;
+  let totalPrincipalPaid = 0;
+  let cursor = debt?.start_date ? startOfDay(debt.start_date) : startOfDay(new Date());
+  const asOf = startOfDay(asOfDate);
+
+  for (const payment of sorted) {
+    const payDate = startOfDay(payment.payment_date || payment.created_at || asOf);
+    const days = daysBetween(cursor, payDate);
+    if (rate > 0 && outstandingPrincipal > 0 && days > 0) {
+      totalInterestAccrued += outstandingPrincipal * (rate / 100) * (days / 365);
+    }
+    const principalPaid = Number(payment.principal_paid) || 0;
+    const interestPaid = Number(payment.interest_paid) || 0;
+    totalPrincipalPaid += principalPaid;
+    totalInterestPaid += interestPaid;
+    outstandingPrincipal = Math.max(0, outstandingPrincipal - principalPaid);
+    cursor = payDate;
+  }
+
+  const tailDays = daysBetween(cursor, asOf);
+  if (rate > 0 && outstandingPrincipal > 0 && tailDays > 0) {
+    totalInterestAccrued += outstandingPrincipal * (rate / 100) * (tailDays / 365);
+  }
+
+  const accruedRounded = round2(totalInterestAccrued);
+  const interestDue = Math.max(0, round2(accruedRounded - (Number(totalInterestPaid) || 0)));
+
+  return {
+    outstanding_principal: round2(outstandingPrincipal),
+    accrued_interest: accruedRounded,
+    interest_due: interestDue,
+    total_paid: round2(totalPrincipalPaid + totalInterestPaid),
+    total_interest_paid: round2(totalInterestPaid),
+    last_payment_date: sorted.length ? sorted[sorted.length - 1].payment_date : null,
+  };
+}
+
+function extendDebtWithSummary(debt, payments = [], asOfDate = new Date()) {
+  const summary = computeDebtState(debt, payments, asOfDate);
+  return {
+    ...debt,
+    outstanding_principal: summary.outstanding_principal,
+    interest_due: summary.interest_due,
+    accrued_interest: summary.accrued_interest,
+    total_due: round2(summary.outstanding_principal + summary.interest_due),
+    total_paid: summary.total_paid,
+    total_interest_paid: summary.total_interest_paid,
+    last_payment_date: summary.last_payment_date ? formatDate(summary.last_payment_date) : null,
+  };
 }
 
 async function getCategory(userId, categoryId) {
@@ -358,6 +445,301 @@ function buildPagedResponse(rows, page, limit, total) {
 }
 
 // Categories
+router.get("/debts", ...withView, async (req, res) => {
+  try {
+    const debtsQ = await pool.query(
+      `SELECT * FROM accounting_debts WHERE user_id = $1 ORDER BY created_at DESC`,
+      [req.user.id]
+    );
+    const paymentsQ = await pool.query(
+      `SELECT debt_id, payment_date, principal_paid, interest_paid FROM accounting_debt_payments WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const paymentsByDebt = new Map();
+    for (const payment of paymentsQ.rows) {
+      const arr = paymentsByDebt.get(payment.debt_id) || [];
+      arr.push(payment);
+      paymentsByDebt.set(payment.debt_id, arr);
+    }
+    const items = debtsQ.rows.map((debt) =>
+      extendDebtWithSummary(debt, paymentsByDebt.get(debt.id) || [], new Date())
+    );
+    res.json({ items });
+  } catch (error) {
+    console.error("[accounting] debts list error", error);
+    res.status(500).json({ message: "Failed to fetch debts" });
+  }
+});
+
+router.get("/debts/:id", ...withView, async (req, res) => {
+  try {
+    if (!isValidUuid(req.params.id)) return res.status(400).json(UUID_ERROR);
+    const debt = await getDebtById(req.user.id, req.params.id);
+    if (!debt) return res.status(404).json({ message: "Debt not found" });
+    const payments = await listDebtPayments(req.user.id, debt.id);
+    const debtWithSummary = extendDebtWithSummary(debt, payments, new Date());
+    const paymentsForResponse = [...payments].sort(
+      (a, b) => new Date(b.payment_date || b.created_at) - new Date(a.payment_date || a.created_at)
+    );
+    res.json({ debt: debtWithSummary, payments: paymentsForResponse });
+  } catch (error) {
+    console.error("[accounting] debt view error", error);
+    res.status(500).json({ message: "Failed to fetch debt" });
+  }
+});
+
+router.post("/debts", ...withEdit, async (req, res) => {
+  try {
+    const payload = pickAllowed(req.body || {}, [
+      "title",
+      "direction",
+      "counterparty",
+      "bank_name",
+      "description",
+      "principal_amount",
+      "currency",
+      "interest_rate_apy",
+      "start_date",
+      "due_date",
+      "is_closed",
+    ]);
+    const title = (payload.title || "").trim();
+    if (!title) return res.status(400).json({ message: "Title is required" });
+    if (!DEBT_DIRECTIONS.has(payload.direction)) {
+      return res.status(400).json({ message: "Invalid direction" });
+    }
+    const counterparty = (payload.counterparty || "").trim();
+    if (!counterparty) return res.status(400).json({ message: "Counterparty is required" });
+    const principal = toAmount(payload.principal_amount);
+    if (!principal) return res.status(400).json({ message: "principal_amount is required" });
+    let interestRate = null;
+    if (payload.interest_rate_apy !== undefined && payload.interest_rate_apy !== null && payload.interest_rate_apy !== "") {
+      interestRate = Number(payload.interest_rate_apy);
+      if (!Number.isFinite(interestRate)) {
+        return res.status(400).json({ message: "interest_rate_apy must be numeric" });
+      }
+    }
+    const startDate = payload.start_date || formatDate(new Date());
+    if (!DATE_REGEXP.test(startDate)) {
+      return res.status(400).json({ message: "start_date must be YYYY-MM-DD" });
+    }
+    if (payload.due_date && !DATE_REGEXP.test(payload.due_date)) {
+      return res.status(400).json({ message: "due_date must be YYYY-MM-DD" });
+    }
+    const insert = await pool.query(
+      `INSERT INTO accounting_debts (
+         user_id, title, direction, counterparty, bank_name, description,
+         principal_amount, currency, interest_rate_apy, start_date, due_date, is_closed
+       ) VALUES (
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+       )
+       RETURNING *`,
+      [
+        req.user.id,
+        title,
+        payload.direction,
+        counterparty,
+        payload.bank_name || null,
+        payload.description || null,
+        principal,
+        (payload.currency || BASE_CURRENCY).toUpperCase(),
+        interestRate,
+        startDate,
+        payload.due_date || null,
+        parseBool(payload.is_closed),
+      ]
+    );
+    const debt = extendDebtWithSummary(insert.rows[0], [], new Date());
+    res.status(201).json({ debt });
+  } catch (error) {
+    console.error("[accounting] create debt error", error);
+    res.status(500).json({ message: "Failed to create debt" });
+  }
+});
+
+router.patch("/debts/:id", ...withEdit, async (req, res) => {
+  try {
+    if (!isValidUuid(req.params.id)) return res.status(400).json(UUID_ERROR);
+    const existing = await getDebtById(req.user.id, req.params.id);
+    if (!existing) return res.status(404).json({ message: "Debt not found" });
+    const payload = pickAllowed(req.body || {}, [
+      "title",
+      "direction",
+      "counterparty",
+      "bank_name",
+      "description",
+      "principal_amount",
+      "currency",
+      "interest_rate_apy",
+      "start_date",
+      "due_date",
+      "is_closed",
+    ]);
+    if (payload.start_date && !DATE_REGEXP.test(payload.start_date)) {
+      return res.status(400).json({ message: "start_date must be YYYY-MM-DD" });
+    }
+    if (payload.due_date && !DATE_REGEXP.test(payload.due_date)) {
+      return res.status(400).json({ message: "due_date must be YYYY-MM-DD" });
+    }
+    const updates = [];
+    const values = [];
+    let idx = 1;
+    for (const [key, value] of Object.entries(payload)) {
+      if (key === "title") {
+        const trimmed = String(value || "").trim();
+        if (!trimmed) return res.status(400).json({ message: "Title cannot be empty" });
+        updates.push(`title = $${idx++}`);
+        values.push(trimmed);
+        continue;
+      }
+      if (key === "direction") {
+        if (!DEBT_DIRECTIONS.has(value)) return res.status(400).json({ message: "Invalid direction" });
+        updates.push(`direction = $${idx++}`);
+        values.push(value);
+        continue;
+      }
+      if (key === "counterparty") {
+        const trimmed = String(value || "").trim();
+        if (!trimmed) return res.status(400).json({ message: "Counterparty cannot be empty" });
+        updates.push(`counterparty = $${idx++}`);
+        values.push(trimmed);
+        continue;
+      }
+      if (key === "principal_amount") {
+        const principal = toAmount(value);
+        if (!principal) return res.status(400).json({ message: "principal_amount must be > 0" });
+        updates.push(`principal_amount = $${idx++}`);
+        values.push(principal);
+        continue;
+      }
+      if (key === "currency" && value) {
+        updates.push(`currency = $${idx++}`);
+        values.push(String(value).toUpperCase());
+        continue;
+      }
+      if (key === "interest_rate_apy") {
+        let rate = null;
+        if (value !== undefined && value !== null && value !== "") {
+          rate = Number(value);
+          if (!Number.isFinite(rate)) {
+            return res.status(400).json({ message: "interest_rate_apy must be numeric" });
+          }
+        }
+        updates.push(`interest_rate_apy = $${idx++}`);
+        values.push(rate);
+        continue;
+      }
+      if (key === "is_closed") {
+        updates.push(`is_closed = $${idx++}`);
+        values.push(parseBool(value));
+        continue;
+      }
+      updates.push(`${key} = $${idx++}`);
+      values.push(value ?? null);
+    }
+    if (updates.length === 0) return res.status(400).json({ message: "No fields to update" });
+    values.push(req.user.id);
+    values.push(req.params.id);
+    const updated = await pool.query(
+      `UPDATE accounting_debts
+       SET ${updates.join(", ")}, updated_at = NOW()
+       WHERE user_id = $${idx++} AND id = $${idx}
+       RETURNING *`,
+      values
+    );
+    if (updated.rows.length === 0) return res.status(404).json({ message: "Debt not found" });
+    const payments = await listDebtPayments(req.user.id, req.params.id);
+    const debt = extendDebtWithSummary(updated.rows[0], payments, new Date());
+    res.json({ debt });
+  } catch (error) {
+    console.error("[accounting] update debt error", error);
+    res.status(500).json({ message: "Failed to update debt" });
+  }
+});
+
+router.delete("/debts/:id", ...withEdit, async (req, res) => {
+  try {
+    if (!isValidUuid(req.params.id)) return res.status(400).json(UUID_ERROR);
+    const deleted = await pool.query(
+      `DELETE FROM accounting_debts WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (deleted.rowCount === 0) return res.status(404).json({ message: "Debt not found" });
+    res.json({ message: "Debt deleted" });
+  } catch (error) {
+    console.error("[accounting] delete debt error", error);
+    res.status(500).json({ message: "Failed to delete debt" });
+  }
+});
+
+router.post("/debts/:id/payments", ...withEdit, async (req, res) => {
+  try {
+    if (!isValidUuid(req.params.id)) return res.status(400).json(UUID_ERROR);
+    const debt = await getDebtById(req.user.id, req.params.id);
+    if (!debt) return res.status(404).json({ message: "Debt not found" });
+    const paymentDate = req.body?.payment_date || formatDate(new Date());
+    if (!DATE_REGEXP.test(paymentDate)) {
+      return res.status(400).json({ message: "payment_date must be YYYY-MM-DD" });
+    }
+    const principalRaw = toAmount(req.body?.principal_amount);
+    if (!principalRaw) return res.status(400).json({ message: "principal_amount is required" });
+    const comment = req.body?.comment || null;
+    const dryRun = parseBool(req.body?.dry_run);
+    const payments = await listDebtPayments(req.user.id, debt.id);
+    const baseState = computeDebtState(debt, payments, paymentDate);
+    const principalPaid = Math.min(principalRaw, baseState.outstanding_principal);
+    const interestComponent =
+      Number(debt.interest_rate_apy) > 0 ? baseState.interest_due : 0;
+    const amountTotal = round2(principalPaid + interestComponent);
+    const simulatedPayment = {
+      payment_date: paymentDate,
+      principal_paid: principalPaid,
+      interest_paid: interestComponent,
+      amount_total: amountTotal,
+      comment,
+      debt_id: debt.id,
+      user_id: req.user.id,
+    };
+
+    if (dryRun) {
+      const previewState = computeDebtState(debt, [...payments, simulatedPayment], paymentDate);
+      return res.json({
+        preview: simulatedPayment,
+        summary: {
+          ...previewState,
+          total_due: round2(previewState.outstanding_principal + previewState.interest_due),
+        },
+      });
+    }
+
+    const insert = await pool.query(
+      `INSERT INTO accounting_debt_payments (debt_id, user_id, payment_date, principal_paid, interest_paid, amount_total, comment)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING *`,
+      [debt.id, req.user.id, paymentDate, principalPaid, interestComponent, amountTotal, comment]
+    );
+    const updatedPayments = [...payments, insert.rows[0]];
+    const stateAfter = computeDebtState(debt, updatedPayments, paymentDate);
+    const shouldClose = stateAfter.outstanding_principal <= 0.01 && stateAfter.interest_due <= 0.01;
+    if (shouldClose !== debt.is_closed) {
+      await pool.query(
+        `UPDATE accounting_debts SET is_closed = $1, updated_at = NOW() WHERE id = $2`,
+        [shouldClose, debt.id]
+      );
+    }
+    res.status(201).json({
+      payment: insert.rows[0],
+      summary: {
+        ...stateAfter,
+        total_due: round2(stateAfter.outstanding_principal + stateAfter.interest_due),
+      },
+    });
+  } catch (error) {
+    console.error("[accounting] add debt payment error", error);
+    res.status(500).json({ message: "Failed to add payment" });
+  }
+});
+
 router.get("/categories", ...withView, async (req, res) => {
   try {
     await ensureSystemCategoriesForUser(req.user.id);
