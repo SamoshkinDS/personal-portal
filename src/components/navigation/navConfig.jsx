@@ -268,6 +268,7 @@ export const DEFAULT_NAV_ITEMS = [
       { id: "admin-content", path: "/admin/content", label: "Контент", icon: NAV_ICONS.doc },
       { id: "admin-logs", path: "/admin/logs", label: "Логи", icon: NAV_ICONS.chart },
       { id: "admin-s3", path: "/admin/s3", label: "S3 Storage", icon: NAV_ICONS.cloud },
+      { id: "admin-flipper", path: "/admin/flipper", label: "Flipper Zero", icon: NAV_ICONS.flipper },
     ],
   },
   { id: "docs", path: "/docs", label: "Документация", icon: NAV_ICONS.docs },

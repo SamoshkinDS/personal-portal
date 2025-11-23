@@ -30,7 +30,20 @@ const N8NIntegration = React.lazy(() => import("./pages/N8NIntegration.jsx"));
 const Promptmaster = React.lazy(() => import("./pages/Promptmaster.jsx"));
 const Docs = React.lazy(() => import("./pages/Docs.jsx"));
 const Posts = React.lazy(() => import("./pages/Posts.jsx"));
-const FlipperZero = React.lazy(() => import("./pages/flipper/FlipperZero.jsx"));
+const FlipperHome = React.lazy(() => import("./pages/flipper/index.jsx"));
+const FlipperBasicList = React.lazy(() => import("./pages/flipper/basic/index.jsx"));
+const FlipperBasicDetail = React.lazy(() => import("./pages/flipper/basic/[slug].jsx"));
+const FlipperFirmwareList = React.lazy(() => import("./pages/flipper/firmware/index.jsx"));
+const FlipperFirmwareDetail = React.lazy(() => import("./pages/flipper/firmware/[slug].jsx"));
+const FlipperModulesList = React.lazy(() => import("./pages/flipper/modules/index.jsx"));
+const FlipperModuleDetail = React.lazy(() => import("./pages/flipper/module/[slug].jsx"));
+const FlipperGuidesList = React.lazy(() => import("./pages/flipper/guides/index.jsx"));
+const FlipperGuideDetail = React.lazy(() => import("./pages/flipper/guide/[slug].jsx"));
+const FlipperVulnsList = React.lazy(() => import("./pages/flipper/vulns/index.jsx"));
+const FlipperVulnDetail = React.lazy(() => import("./pages/flipper/vuln/[slug].jsx"));
+const FlipperArticlesList = React.lazy(() => import("./pages/flipper/articles/index.jsx"));
+const FlipperArticleDetail = React.lazy(() => import("./pages/flipper/article/[slug].jsx"));
+const FlipperHelp = React.lazy(() => import("./pages/flipper/help.jsx"));
 const Settings = React.lazy(() => import("./pages/Settings.jsx"));
 const AccountingDashboard = React.lazy(() => import("./pages/accounting/Dashboard.jsx"));
 const AccountingAccounts = React.lazy(() => import("./pages/accounting/Accounts.jsx"));
@@ -46,6 +59,7 @@ const AdminContent = React.lazy(() => import("./pages/admin/Content.jsx"));
 const AdminLogs = React.lazy(() => import("./pages/admin/Logs.jsx"));
 const S3Manager = React.lazy(() => import("./pages/admin/S3Manager.jsx"));
 const AdminUsers = React.lazy(() => import("./pages/admin/Users.jsx"));
+const FlipperZeroAdmin = React.lazy(() => import("./pages/admin/FlipperZeroAdmin.jsx"));
 const NotFound = React.lazy(() => import("./pages/NotFound.jsx"));
 const Home = React.lazy(() => import("./pages/Home.jsx"));
 const CarPage = React.lazy(() => import("./pages/Car.jsx"));
@@ -591,7 +605,111 @@ export const router = createBrowserRouter(
           path="flipper"
           element={
             <RouteTransition>
-              <FlipperZero />
+              <FlipperHome />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/basic"
+          element={
+            <RouteTransition>
+              <FlipperBasicList />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/basic/:slug"
+          element={
+            <RouteTransition>
+              <FlipperBasicDetail />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/firmware"
+          element={
+            <RouteTransition>
+              <FlipperFirmwareList />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/firmware/:slug"
+          element={
+            <RouteTransition>
+              <FlipperFirmwareDetail />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/modules"
+          element={
+            <RouteTransition>
+              <FlipperModulesList />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/module/:slug"
+          element={
+            <RouteTransition>
+              <FlipperModuleDetail />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/guides"
+          element={
+            <RouteTransition>
+              <FlipperGuidesList />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/guide/:slug"
+          element={
+            <RouteTransition>
+              <FlipperGuideDetail />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/vulns"
+          element={
+            <RouteTransition>
+              <FlipperVulnsList />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/vuln/:slug"
+          element={
+            <RouteTransition>
+              <FlipperVulnDetail />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/articles"
+          element={
+            <RouteTransition>
+              <FlipperArticlesList />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/article/:slug"
+          element={
+            <RouteTransition>
+              <FlipperArticleDetail />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="flipper/help"
+          element={
+            <RouteTransition>
+              <FlipperHelp />
             </RouteTransition>
           }
         />
@@ -785,6 +903,16 @@ export const router = createBrowserRouter(
             <PermissionGate check={canAccessAdmin}>
               <RouteTransition>
                 <S3Manager />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="admin/flipper"
+          element={
+            <PermissionGate check={canAccessAdmin}>
+              <RouteTransition>
+                <FlipperZeroAdmin />
               </RouteTransition>
             </PermissionGate>
           }
