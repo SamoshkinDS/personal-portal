@@ -33,6 +33,8 @@ import carRoutes from "./routes/car.js";
 import s3ManagerRoutes from "./routes/s3manager.js";
 import homeRoutes from "./routes/home.js";
 import flipperRoutes from "./routes/flipper.js";
+import wishRoutes from "./routes/wish.js";
+import sharedRoutes, { sharedPublicRouter } from "./routes/shared.js";
 import { pool } from "./db/connect.js";
 import { ensurePlantsSchema } from "./db/plantsSchema.js";
 import { ensureCareCatalogSchema } from "./db/careSchema.js";
@@ -47,6 +49,8 @@ import { ensureCarSchema } from "./db/carSchema.js";
 import { ensureRegistrationRequestsSchema } from "./db/registrationRequestsSchema.js";
 import { ensureHomeSchema } from "./db/homeSchema.js";
 import { ensureFlipperSchema } from "./db/flipperSchema.js";
+import { ensureWishSchema } from "./db/wishSchema.js";
+import { ensureSharedLinksSchema } from "./db/sharedLinksSchema.js";
 import { syncVlessStats } from "./services/xray.js";
 import {
   createUtilityPlaceholders,
@@ -99,6 +103,9 @@ app.use("/api/car", carRoutes);
 app.use("/api/s3", s3ManagerRoutes);
 app.use("/api/home", homeRoutes);
 app.use("/api/flipper", flipperRoutes);
+app.use("/api/wish", wishRoutes);
+app.use("/api/shared", sharedRoutes);
+app.use("/shared", sharedPublicRouter);
 
 const XRAY_CRON_ENABLED = String(process.env.XRAY_CRON_DISABLED || "false").toLowerCase() !== "true";
 const ACCOUNTING_JOBS_ENABLED = String(process.env.ACCOUNTING_JOBS_DISABLED || "false").toLowerCase() !== "true";
@@ -591,8 +598,10 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureHomeSchema();
     await ensureRegistrationRequestsSchema();
     await ensureFlipperSchema();
+    await ensureWishSchema();
+    await ensureSharedLinksSchema();
     console.log(
-      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, accounting_debts, dashboard_preferences, navigation_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home, flipper"
+      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, accounting_debts, dashboard_preferences, navigation_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home, flipper, wish, shared_links"
     );
   } catch (err) {
     console.error("DB init error", err);

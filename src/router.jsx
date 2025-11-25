@@ -58,11 +58,14 @@ const ResetPassword = React.lazy(() => import("./pages/ResetPassword.jsx"));
 const AdminHome = React.lazy(() => import("./pages/admin/Index.jsx"));
 const AdminContent = React.lazy(() => import("./pages/admin/Content.jsx"));
 const AdminLogs = React.lazy(() => import("./pages/admin/Logs.jsx"));
+const AdminSharedLinks = React.lazy(() => import("./pages/admin/SharedLinks.jsx"));
 const S3Manager = React.lazy(() => import("./pages/admin/S3Manager.jsx"));
 const AdminUsers = React.lazy(() => import("./pages/admin/Users.jsx"));
 const FlipperZeroAdmin = React.lazy(() => import("./pages/admin/FlipperZeroAdmin.jsx"));
 const NotFound = React.lazy(() => import("./pages/NotFound.jsx"));
 const Home = React.lazy(() => import("./pages/Home.jsx"));
+const WishListPage = React.lazy(() => import("./pages/WishList.jsx"));
+const WishListSharedPage = React.lazy(() => import("./pages/shared/WishListShared.jsx"));
 const CarPage = React.lazy(() => import("./pages/Car.jsx"));
 const HomeModule = React.lazy(() => import("./pages/home/HomeModule.jsx"));
 const Outline = React.lazy(() => import("./pages/vpn/Outline.jsx"));
@@ -236,6 +239,14 @@ const canViewAccounting = ({ can, perms }) => canAccountingEdit({ can }) || can(
 export const router = createBrowserRouter(
   createRoutesFromElements(
     <Route element={<AppShell />}>
+      <Route
+        path="shared/:token"
+        element={
+          <RouteTransition disable>
+            <WishListSharedPage />
+          </RouteTransition>
+        }
+      />
       <Route element={<PublicLayout />}>
         <Route
           path="login"
@@ -277,6 +288,14 @@ export const router = createBrowserRouter(
           element={
             <RouteTransition>
               <CarPage />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="wish"
+          element={
+            <RouteTransition>
+              <WishListPage />
             </RouteTransition>
           }
         />
@@ -904,6 +923,16 @@ export const router = createBrowserRouter(
             <PermissionGate check={canAccessAdmin}>
               <RouteTransition>
                 <AdminContent />
+              </RouteTransition>
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="admin/shared"
+          element={
+            <PermissionGate check={canAccessAdmin}>
+              <RouteTransition>
+                <AdminSharedLinks />
               </RouteTransition>
             </PermissionGate>
           }

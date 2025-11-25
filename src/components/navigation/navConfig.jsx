@@ -129,6 +129,15 @@ export const NAV_ICONS = {
       <path d="M11 16H7" />
     </svg>
   ),
+  gift: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="M12 5a2.5 2.5 0 1 0-5 0c0 1.4 1.1 2.5 2.5 2.5H12z" />
+      <path d="M12 5a2.5 2.5 0 1 1 5 0c0 1.4-1.1 2.5-2.5 2.5H12z" />
+      <path d="M12 7.5v14" />
+      <path d="M3 11h18" />
+      <path d="M4 7.5h16v14H4z" />
+    </svg>
+  ),
   tools: (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
       <path d="m7 7 2-2 3 3-2 2z" />
@@ -168,6 +177,7 @@ export const NAV_ICONS = {
 
 export const DEFAULT_NAV_ITEMS = [
   { id: "home", path: "/", label: "Главная", icon: NAV_ICONS.home },
+  { id: "wish", path: "/wish", label: "Wish List", icon: NAV_ICONS.gift },
   { id: "apartment", path: "/home", label: "Квартира", icon: NAV_ICONS.apartment },
   { id: "car", path: "/car", label: "Авто", icon: NAV_ICONS.car },
   {
@@ -267,6 +277,7 @@ export const DEFAULT_NAV_ITEMS = [
       { id: "admin-home", path: "/admin", label: "Обзор", icon: NAV_ICONS.home },
       { id: "admin-users", path: "/admin/users", label: "Пользователи", icon: NAV_ICONS.doc },
       { id: "admin-content", path: "/admin/content", label: "Контент", icon: NAV_ICONS.doc },
+      { id: "admin-shared", path: "/admin/shared", label: "Публичные ссылки", icon: NAV_ICONS.doc },
       { id: "admin-logs", path: "/admin/logs", label: "Логи", icon: NAV_ICONS.chart },
       { id: "admin-s3", path: "/admin/s3", label: "S3 Storage", icon: NAV_ICONS.cloud },
       { id: "admin-flipper", path: "/admin/flipper", label: "Flipper Zero", icon: NAV_ICONS.flipper },

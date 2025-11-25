@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 
 const LABELS = {
   "": "Главная",
+  wish: "Wish List",
   car: "Авто",
   analytics: "Аналитика",
   topics: "Темы",
