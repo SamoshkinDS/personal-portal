@@ -66,6 +66,7 @@ const NotFound = React.lazy(() => import("./pages/NotFound.jsx"));
 const Home = React.lazy(() => import("./pages/Home.jsx"));
 const WishListPage = React.lazy(() => import("./pages/WishList.jsx"));
 const WishListSharedPage = React.lazy(() => import("./pages/shared/WishListShared.jsx"));
+const WorkspacePage = React.lazy(() => import("./pages/workspace/Workspace.jsx"));
 const CarPage = React.lazy(() => import("./pages/Car.jsx"));
 const HomeModule = React.lazy(() => import("./pages/home/HomeModule.jsx"));
 const Outline = React.lazy(() => import("./pages/vpn/Outline.jsx"));
@@ -280,6 +281,14 @@ export const router = createBrowserRouter(
           element={
             <RouteTransition>
               <HomeModule />
+            </RouteTransition>
+          }
+        />
+        <Route
+          path="workspace"
+          element={
+            <RouteTransition>
+              <WorkspacePage />
             </RouteTransition>
           }
         />

@@ -3,7 +3,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageShell from "../components/PageShell.jsx";
-import TaskBoard from "../components/TaskBoard.jsx";
 import ErrorBoundary from "../components/ErrorBoundary.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -269,13 +268,21 @@ function Home() {
       </section>
 
       <section className="rounded-3xl border border-slate-200/60 bg-white/90 p-6 shadow-sm transition-colors duration-500 dark:border-slate-700/60 dark:bg-slate-900/80">
-        <ErrorBoundary fallback={() => (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-500/10 dark:text-rose-100">
-            ������ � �ண��� �����. ���������� �������� ���������� ���� ��� ���������, ���� ������ �� �ண��� � �����.
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">Workspace</p>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Рабочее пространство</h2>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Виджеты, авто-задачи и доска переехали в отдельный раздел. Там можно включать только нужные блоки и задавать сроки напоминаний.
+            </p>
           </div>
-        )}>
-          <TaskBoard />
-        </ErrorBoundary>
+          <Link
+            to="/workspace"
+            className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow transition hover:-translate-y-0.5 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+          >
+            Открыть Workspace
+          </Link>
+        </div>
       </section>
     </PageShell>
   );

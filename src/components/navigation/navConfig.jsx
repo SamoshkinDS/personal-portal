@@ -161,6 +161,15 @@ export const NAV_ICONS = {
       <circle cx="12" cy="17.5" r="1" />
     </svg>
   ),
+  workspace: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <rect x="3" y="4" width="8" height="7" rx="1.5" />
+      <rect x="13" y="4" width="8" height="7" rx="1.5" />
+      <rect x="3" y="13" width="8" height="7" rx="1.5" />
+      <path d="M16 13h3a1 1 0 0 1 1 1v6h-8v-6a1 1 0 0 1 1-1h1" />
+      <path d="M15 17h4" />
+    </svg>
+  ),
   cloud: (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
       <path d="M18 10a4 4 0 0 0-7.9-1.2A3 3 0 0 0 6 11a3 3 0 0 0 .3 1.3A3.5 3.5 0 0 0 7 18.5h9a4 4 0 0 0 2-7.5Z" />
@@ -177,6 +186,7 @@ export const NAV_ICONS = {
 
 export const DEFAULT_NAV_ITEMS = [
   { id: "home", path: "/", label: "Главная", icon: NAV_ICONS.home },
+  { id: "workspace", path: "/workspace", label: "Workspace", icon: NAV_ICONS.workspace },
   { id: "wish", path: "/wish", label: "Wish List", icon: NAV_ICONS.gift },
   { id: "apartment", path: "/home", label: "Квартира", icon: NAV_ICONS.apartment },
   { id: "car", path: "/car", label: "Авто", icon: NAV_ICONS.car },

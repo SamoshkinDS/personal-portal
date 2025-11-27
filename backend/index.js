@@ -35,6 +35,7 @@ import homeRoutes from "./routes/home.js";
 import flipperRoutes from "./routes/flipper.js";
 import wishRoutes from "./routes/wish.js";
 import sharedRoutes, { sharedPublicRouter } from "./routes/shared.js";
+import workspaceRoutes from "./routes/workspace.js";
 import { pool } from "./db/connect.js";
 import { ensurePlantsSchema } from "./db/plantsSchema.js";
 import { ensureCareCatalogSchema } from "./db/careSchema.js";
@@ -48,6 +49,7 @@ import { ensureCareerSchema } from "./db/careerSchema.js";
 import { ensureCarSchema } from "./db/carSchema.js";
 import { ensureRegistrationRequestsSchema } from "./db/registrationRequestsSchema.js";
 import { ensureHomeSchema } from "./db/homeSchema.js";
+import { ensureWorkspaceSchema } from "./db/workspaceSchema.js";
 import { ensureFlipperSchema } from "./db/flipperSchema.js";
 import { ensureWishSchema } from "./db/wishSchema.js";
 import { ensureSharedLinksSchema } from "./db/sharedLinksSchema.js";
@@ -102,6 +104,7 @@ app.use("/api/career", careerRoutes);
 app.use("/api/car", carRoutes);
 app.use("/api/s3", s3ManagerRoutes);
 app.use("/api/home", homeRoutes);
+app.use("/api/workspace", workspaceRoutes);
 app.use("/api/flipper", flipperRoutes);
 app.use("/api/wish", wishRoutes);
 app.use("/api/shared", sharedRoutes);
@@ -596,12 +599,13 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureCarSchema();
     await ensurePromptmasterSchema();
     await ensureHomeSchema();
+    await ensureWorkspaceSchema();
     await ensureRegistrationRequestsSchema();
     await ensureFlipperSchema();
     await ensureWishSchema();
     await ensureSharedLinksSchema();
     console.log(
-      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, accounting_debts, dashboard_preferences, navigation_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home, flipper, wish, shared_links"
+      "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, accounting_debts, dashboard_preferences, navigation_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home, workspace, flipper, wish, shared_links"
     );
   } catch (err) {
     console.error("DB init error", err);

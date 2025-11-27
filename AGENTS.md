@@ -13,6 +13,8 @@ AGENTS: Personal Portal
 - Основные домены:
   - Домашний дашборд и задачи (todos, списки задач, заметки).
   - Wish List — личные списки желаний пользователя (приватные карточки с приоритетами, ссылками и архивом).
+
+- Workspace — настраиваемая страница рабочего стола с виджетами, авто-задачами и доской задач, собирающей данные из квартиры/финансов.
   - Shared links — временные публичные ссылки на Wish List c токеном /shared/:token, ограниченными правами и отзывом.
   - Аналитика: темы, статьи, очередь публикаций, интервью, знания/тесты.
   - Квартира: управляющая компания, телефоны, внешние камеры и учёт водяных счётчиков (/home).
@@ -128,7 +130,7 @@ AGENTS: Personal Portal
 - `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`, `/career/interviews`, `/career/knowledge`, `/career/portfolio/export`.
 - `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`, `/career/interviews`, `/career/knowledge`, `/career/portfolio/export`, `/career/portfolio/timeline`.
 - `career/` — страница дашборда профессионального развития с метриками, радаром, активностью и разделами `/career/skills`, `/career/courses`, `/career/portfolio`, `/career/interviews`, `/career/knowledge`, `/career/portfolio/export`, `/career/portfolio/timeline`, `/career/analytics`.
-- базовые страницы: `Home`, `WishList`, `AI`, `N8NIntegration`, `Promptmaster`, `Docs`, `Settings`, `Login`, `DebugDnd`, `NotFound` и др.
+- базовые страницы: `Home`, `WishList`, `AI`, `N8NIntegration`, `Promptmaster`, `Workspace`, `Docs`, `Settings`, `Login`, `DebugDnd`, `NotFound` и др.
 - `components/` — переиспользуемые компоненты (Layout, Sidebar, Header, модалки и т.п.).
 - `context/` — контексты (в первую очередь `AuthContext`).
 - `api/` — API-клиенты поверх `apiAuthFetch` (`analytics.js`, `accounting.js`, `career.js`, `plants.js`, `promptmaster.js`, `integrationSettings.js`, `car.js`, `home.js` и др.).
