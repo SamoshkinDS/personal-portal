@@ -89,6 +89,16 @@ export const homeApi = {
     return handleResponse(response, "Не удалось удалить камеру");
   },
 
+  async getMeterSettings() {
+    const response = await apiAuthFetch("/api/home/meter-settings");
+    return handleResponse(response, "Не удалось получить настройки счётчиков");
+  },
+
+  async saveMeterSettings(payload) {
+    const response = await apiAuthFetch("/api/home/meter-settings", { method: "PUT", ...jsonOptions(payload) });
+    return handleResponse(response, "Не удалось сохранить настройки счётчиков");
+  },
+
   async listMeters() {
     const response = await apiAuthFetch("/api/home/meters");
     return handleResponse(response, "Не удалось загрузить счётчики");

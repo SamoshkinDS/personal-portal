@@ -7,6 +7,7 @@ const tablesWithTrigger = [
   { name: "home_cameras", trigger: "home_cameras_set_updated_at" },
   { name: "home_meters", trigger: "home_meters_set_updated_at" },
   { name: "home_meter_records", trigger: "home_meter_records_set_updated_at" },
+  { name: "home_meter_settings", trigger: "home_meter_settings_set_updated_at" },
 ];
 
 async function ensureUpdatedAtTriggers() {
@@ -103,6 +104,15 @@ export async function ensureHomeSchema() {
     CREATE INDEX IF NOT EXISTS home_meter_records_meter_idx ON home_meter_records(meter_id, reading_date DESC, id DESC);
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS home_meter_settings (
+      id SERIAL PRIMARY KEY,
+      due_day SMALLINT CHECK (due_day BETWEEN 1 AND 31),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
   await ensureUpdatedAtTriggers();
 
   const defaultMeters = [
@@ -127,5 +137,10 @@ export async function ensureHomeSchema() {
     INSERT INTO home_company (id, name)
     SELECT 1, 'Управляющая компания'
     WHERE NOT EXISTS (SELECT 1 FROM home_company);
+  `);
+  await pool.query(`
+    INSERT INTO home_meter_settings (id, due_day)
+    SELECT 1, NULL
+    WHERE NOT EXISTS (SELECT 1 FROM home_meter_settings);
   `);
 }

@@ -1,6 +1,8 @@
 import React from "react";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
+import { IMaskInput } from "react-imask";
+import { FiEdit2 } from "react-icons/fi";
 import PageShell from "../../components/PageShell.jsx";
 import Modal from "../../components/Modal.jsx";
 import { homeApi } from "../../api/home.js";
@@ -8,6 +10,7 @@ import { homeApi } from "../../api/home.js";
 const blankContact = { id: null, title: "", phone: "", comments: "" };
 const blankCamera = { id: null, title: "", url: "", username: "", password: "" };
 const blankMeter = { id: null, title: "", code: "", meter_number: "" };
+const PHONE_PLACEHOLDER = "+7 (___) ___-__-__";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -23,6 +26,92 @@ function formatNumber(value) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 3 }).format(num);
 }
 
+function getDaysInMonth(year, monthIndex) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function getMeterDeadlineInfo(dueDay) {
+  const dayNumber = Number(dueDay);
+  if (!Number.isInteger(dayNumber) || dayNumber < 1 || dayNumber > 31) {
+    return { dueDay: null, deadlineDate: null, daysLeft: null, isCurrentMonth: true, isOverdue: false };
+  }
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentMonthDay = Math.min(dayNumber, getDaysInMonth(now.getFullYear(), now.getMonth()));
+  const currentDeadline = new Date(now.getFullYear(), now.getMonth(), currentMonthDay);
+  const isOverdue = today > currentDeadline;
+  let deadline = currentDeadline;
+  let isCurrentMonth = !isOverdue;
+  if (isOverdue) {
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextMonthDay = Math.min(dayNumber, getDaysInMonth(nextMonth.getFullYear(), nextMonth.getMonth()));
+    deadline = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), nextMonthDay);
+  }
+  const diffMs = deadline.getTime() - today.getTime();
+  const daysLeft = Math.max(0, Math.ceil(diffMs / 86400000));
+  return {
+    dueDay: dayNumber,
+    deadlineDate: deadline,
+    daysLeft,
+    isCurrentMonth,
+    isOverdue,
+  };
+}
+
+function extractPhoneDigits(value) {
+  if (!value) return "";
+  const digits = String(value).replace(/\D/g, "");
+  if (!digits) return "";
+  let normalized = digits;
+  if (normalized.length === 11 && (normalized.startsWith("7") || normalized.startsWith("8"))) {
+    normalized = normalized.slice(1);
+  } else if (normalized.length > 11) {
+    normalized = normalized.slice(-10);
+  }
+  return normalized.slice(0, 10);
+}
+
+function formatPhoneFromDigits(digits) {
+  if (!digits) return "";
+  const part1 = digits.slice(0, 3);
+  const part2 = digits.slice(3, 6);
+  const part3 = digits.slice(6, 8);
+  const part4 = digits.slice(8, 10);
+  let result = "+7";
+  if (part1) {
+    result += ` (${part1}`;
+    if (part1.length === 3) {
+      result += ")";
+    }
+  }
+  if (part2) {
+    result += `${part1 && part1.length === 3 ? " " : ""}${part2}`;
+  }
+  if (part3) {
+    result += `-${part3}`;
+  }
+  if (part4) {
+    result += `-${part4}`;
+  }
+  return result;
+}
+
+function formatPhoneInputValue(value) {
+  const digits = extractPhoneDigits(value);
+  return digits ? formatPhoneFromDigits(digits) : "";
+}
+
+function formatPhoneDisplay(value) {
+  const digits = extractPhoneDigits(value);
+  if (!digits) return value || "";
+  return formatPhoneFromDigits(digits);
+}
+
+function buildTelHref(value) {
+  const digits = extractPhoneDigits(value);
+  return digits ? `tel:+7${digits}` : null;
+}
+
 export default function HomeModule() {
   const [loading, setLoading] = React.useState(true);
   const [company, setCompany] = React.useState(null);
@@ -30,6 +119,9 @@ export default function HomeModule() {
   const [cameras, setCameras] = React.useState([]);
   const [meters, setMeters] = React.useState([]);
   const [records, setRecords] = React.useState([]);
+  const [meterSettings, setMeterSettings] = React.useState(null);
+  const [meterSettingsForm, setMeterSettingsForm] = React.useState("");
+  const [meterSettingsSaving, setMeterSettingsSaving] = React.useState(false);
 
   const [companyModalOpen, setCompanyModalOpen] = React.useState(false);
   const [companyForm, setCompanyForm] = React.useState({
@@ -53,19 +145,25 @@ export default function HomeModule() {
 
   const [submitting, setSubmitting] = React.useState(false);
 
+  const meterDeadlineInfo = React.useMemo(() => getMeterDeadlineInfo(meterSettings?.due_day), [meterSettings]);
+
   const loadData = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [companyData, contactsData, camerasData, metersData] = await Promise.all([
+      const [companyData, contactsData, camerasData, metersData, meterSettingsData] = await Promise.all([
         homeApi.getCompany(),
         homeApi.listContacts(),
         homeApi.listCameras(),
         homeApi.listMeters(),
+        homeApi.getMeterSettings(),
       ]);
       setCompany(companyData.company || null);
       setContacts(contactsData.items || []);
       setCameras(camerasData.items || []);
       setMeters(metersData.items || []);
+      const settings = meterSettingsData.settings || null;
+      setMeterSettings(settings);
+      setMeterSettingsForm(settings?.due_day ? String(settings.due_day) : "");
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Не удалось загрузить раздел Квартира");
@@ -81,8 +179,8 @@ export default function HomeModule() {
   const openCompanyEditor = () => {
     setCompanyForm({
       name: company?.name || "",
-      phone: company?.phone || "",
-      emergency_phone: company?.emergency_phone || "",
+      phone: formatPhoneInputValue(company?.phone),
+      emergency_phone: formatPhoneInputValue(company?.emergency_phone),
       email: company?.email || "",
       work_hours: company?.work_hours || "",
       account_number: company?.account_number || "",
@@ -139,13 +237,23 @@ export default function HomeModule() {
   };
 
   const handleDeleteContact = async (item) => {
-    if (!window.confirm("Удалить контакт?")) return;
+    if (!window.confirm("Удалить контакт?")) return false;
     try {
       await homeApi.deleteContact(item.id);
       toast.success("Контакт удалён");
       await loadData();
+      return true;
     } catch (err) {
       toast.error(err.message || "Не удалось удалить контакт");
+      return false;
+    }
+  };
+
+  const handleContactModalDelete = async () => {
+    if (!contactModal.data?.id) return;
+    const success = await handleDeleteContact(contactModal.data);
+    if (success) {
+      setContactModal({ open: false, data: blankContact });
     }
   };
 
@@ -212,13 +320,49 @@ export default function HomeModule() {
   };
 
   const handleDeleteMeter = async (item) => {
-    if (!window.confirm("Удалить счётчик и его историю?")) return;
+    if (!window.confirm("Удалить счётчик и его историю?")) return false;
     try {
       await homeApi.deleteMeter(item.id);
       toast.success("Счётчик удалён");
       await loadData();
+      return true;
     } catch (err) {
       toast.error(err.message || "Не удалось удалить счётчик");
+      return false;
+    }
+  };
+
+  const handleMeterModalDelete = async () => {
+    if (!meterModal.data?.id) return;
+    const success = await handleDeleteMeter(meterModal.data);
+    if (success) {
+      setMeterModal({ open: false, data: blankMeter });
+    }
+  };
+
+  const handleSaveMeterSettings = async (e) => {
+    e.preventDefault();
+    const raw = (meterSettingsForm || "").toString().trim();
+    let dueDay = null;
+    if (raw) {
+      const parsed = Number(raw);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 31) {
+        toast.error("Укажите число от 1 до 31");
+        return;
+      }
+      dueDay = parsed;
+    }
+    setMeterSettingsSaving(true);
+    try {
+      const data = await homeApi.saveMeterSettings({ due_day: dueDay });
+      const settings = data.settings || null;
+      setMeterSettings(settings);
+      setMeterSettingsForm(settings?.due_day ? String(settings.due_day) : "");
+      toast.success(dueDay ? "Дата сдачи обновлена" : "Дата сдачи сброшена");
+    } catch (err) {
+      toast.error(err.message || "Не удалось сохранить дату сдачи");
+    } finally {
+      setMeterSettingsSaving(false);
     }
   };
 
@@ -287,27 +431,25 @@ export default function HomeModule() {
         className="flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm transition dark:border-slate-700/60 dark:bg-slate-900/70"
       >
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{meter.code || "счётчик"}</div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{meter.title}</div>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <IconButton
+                onClick={() => setMeterModal({ open: true, data: { ...meter, meter_number: meter.meter_number || "" } })}
+                ariaLabel="Редактировать счётчик"
+              />
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{meter.code || "счётчик"}</div>
+                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{meter.title}</div>
+              </div>
+            </div>
             {meter.meter_number && <div className="text-xs text-slate-500 dark:text-slate-400">№ {meter.meter_number}</div>}
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setMeterModal({ open: true, data: { ...meter, meter_number: meter.meter_number || "" } })}
-              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-100"
-            >
-              Редактировать
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDeleteMeter(meter)}
-              className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
-            >
-              Удалить
-            </button>
-          </div>
+          {last && (
+            <div className="text-right text-sm text-slate-500 dark:text-slate-400">
+              <div className="font-semibold text-slate-900 dark:text-slate-100">{formatNumber(last?.value)}</div>
+              <div>последнее</div>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
@@ -362,8 +504,8 @@ export default function HomeModule() {
                 </div>
               </div>
               <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <InfoCell label="Телефон" value={company?.phone} />
-                <InfoCell label="Аварийный" value={company?.emergency_phone} />
+                <InfoCell label="Телефон" value={company?.phone} isPhone />
+                <InfoCell label="Аварийный" value={company?.emergency_phone} isPhone />
                 <InfoCell label="Почта" value={company?.email} />
                 <InfoCell label="График" value={company?.work_hours} />
                 <InfoCell label="Лицевой счёт" value={company?.account_number} />
@@ -411,28 +553,18 @@ export default function HomeModule() {
               <div className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
                 {contacts.length === 0 && <div className="py-4 text-sm text-slate-500 dark:text-slate-400">Контактов пока нет</div>}
                 {contacts.map((item) => (
-                  <div key={item.id} className="flex items-start gap-3 py-3">
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.title}</div>
-                      <div className="text-sm text-slate-600 dark:text-slate-300">{item.phone || "—"}</div>
-                      {item.comments && <div className="text-xs text-slate-500 dark:text-slate-400">{item.comments}</div>}
+                  <div key={item.id} className="flex flex-col gap-1 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        <IconButton
+                          onClick={() => setContactModal({ open: true, data: { ...item, phone: formatPhoneInputValue(item.phone) } })}
+                          ariaLabel="Редактировать контакт"
+                        />
+                        <span>{item.title}</span>
+                      </div>
+                      <PhoneActionText value={item.phone} className="text-sm text-slate-900 dark:text-slate-100 text-right" />
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setContactModal({ open: true, data: { ...item } })}
-                        className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-100"
-                      >
-                        Править
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteContact(item)}
-                        className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
-                      >
-                        Удалить
-                      </button>
-                    </div>
+                    {item.comments && <div className="text-xs text-slate-500 dark:text-slate-400">{item.comments}</div>}
                   </div>
                 ))}
               </div>
@@ -456,6 +588,61 @@ export default function HomeModule() {
                 >
                   Новый
                 </button>
+              </div>
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 text-sm dark:border-slate-700/60 dark:bg-slate-800/60">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">Срок сдачи показаний</p>
+                    {meterDeadlineInfo.dueDay ? (
+                      <>
+                        <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                          До {meterDeadlineInfo.dueDay}-го числа каждого месяца
+                        </p>
+                        <p
+                          className={`text-xs font-medium ${
+                            meterDeadlineInfo.isOverdue ? "text-rose-500 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                          }`}
+                        >
+                          {meterDeadlineInfo.daysLeft === 0
+                            ? meterDeadlineInfo.isOverdue
+                              ? "Срок в этом месяце пропущен"
+                              : "Нужно передать сегодня"
+                            : meterDeadlineInfo.isOverdue
+                            ? `Следующий срок через ${meterDeadlineInfo.daysLeft} дн.`
+                            : `Осталось ${meterDeadlineInfo.daysLeft} дн.`}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-base text-slate-600 dark:text-slate-300">
+                        Укажите день месяца, чтобы следить за сдачей показаний.
+                      </p>
+                    )}
+                  </div>
+                  <form className="flex flex-wrap items-end gap-3" onSubmit={handleSaveMeterSettings}>
+                    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <span>День месяца</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={meterSettingsForm}
+                        onChange={(e) => setMeterSettingsForm(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                        placeholder="20"
+                        className="w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                      <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                        Оставьте поле пустым для сброса
+                      </span>
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={meterSettingsSaving}
+                      className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                    >
+                      {meterSettingsSaving ? "Сохраняем..." : "Сохранить"}
+                    </button>
+                  </form>
+                </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">{meterCards}</div>
             </motion.div>
@@ -530,8 +717,8 @@ export default function HomeModule() {
         <form className="space-y-4" onSubmit={handleSaveCompany}>
           <div className="grid gap-4 md:grid-cols-2">
             <Input label="Название" value={companyForm.name} onChange={(v) => setCompanyForm((prev) => ({ ...prev, name: v }))} required />
-            <Input label="Телефон" value={companyForm.phone} onChange={(v) => setCompanyForm((prev) => ({ ...prev, phone: v }))} />
-            <Input
+            <PhoneInput label="Телефон" value={companyForm.phone} onChange={(v) => setCompanyForm((prev) => ({ ...prev, phone: v }))} />
+            <PhoneInput
               label="Аварийный телефон"
               value={companyForm.emergency_phone}
               onChange={(v) => setCompanyForm((prev) => ({ ...prev, emergency_phone: v }))}
@@ -628,7 +815,7 @@ export default function HomeModule() {
             onChange={(v) => setContactModal((prev) => ({ ...prev, data: { ...prev.data, title: v } }))}
             required
           />
-          <Input label="Телефон" value={contactModal.data.phone} onChange={(v) => setContactModal((prev) => ({ ...prev, data: { ...prev.data, phone: v } }))} />
+          <PhoneInput label="Телефон" value={contactModal.data.phone} onChange={(v) => setContactModal((prev) => ({ ...prev, data: { ...prev.data, phone: v } }))} />
           <label className="flex flex-col gap-2 text-sm">
             <span className="font-semibold text-slate-800 dark:text-slate-100">Комментарии</span>
             <textarea
@@ -638,21 +825,32 @@ export default function HomeModule() {
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </label>
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setContactModal({ open: false, data: blankContact })}
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-100"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-            >
-              {submitting ? "Сохраняем..." : "Сохранить"}
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {contactModal.data.id && (
+              <button
+                type="button"
+                onClick={handleContactModalDelete}
+                className="rounded-full border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
+              >
+                Удалить
+              </button>
+            )}
+            <div className="ml-auto flex gap-3">
+              <button
+                type="button"
+                onClick={() => setContactModal({ open: false, data: blankContact })}
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-100"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              >
+                {submitting ? "Сохраняем..." : "Сохранить"}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>
@@ -720,21 +918,32 @@ export default function HomeModule() {
             onChange={(v) => setMeterModal((prev) => ({ ...prev, data: { ...prev.data, meter_number: v } }))}
             placeholder="серийный номер"
           />
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setMeterModal({ open: false, data: blankMeter })}
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-100"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-            >
-              {submitting ? "Сохраняем..." : "Сохранить"}
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {meterModal.data.id && (
+              <button
+                type="button"
+                onClick={handleMeterModalDelete}
+                className="rounded-full border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
+              >
+                Удалить счётчик
+              </button>
+            )}
+            <div className="ml-auto flex gap-3">
+              <button
+                type="button"
+                onClick={() => setMeterModal({ open: false, data: blankMeter })}
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-100"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              >
+                {submitting ? "Сохраняем..." : "Сохранить"}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>
@@ -830,11 +1039,97 @@ function Input({ label, value, onChange, placeholder = "", required = false }) {
   );
 }
 
-function InfoCell({ label, value }) {
+function PhoneInput({ label, value, onChange, required = false, placeholder = PHONE_PLACEHOLDER }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="font-semibold text-slate-800 dark:text-slate-100">{label}</span>
+      <IMaskInput
+        mask="+7 (000) 000-00-00"
+        lazy
+        overwrite
+        autofix
+        value={value || ""}
+        inputMode="tel"
+        placeholder={placeholder}
+        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+        onAccept={(val) => {
+          onChange?.(val || "");
+        }}
+        required={required}
+      />
+    </label>
+  );
+}
+
+function PhoneActionText({ value, className = "", showHint = false }) {
+  const formattedValue = formatPhoneDisplay(value);
+
+  const handleClick = () => {
+    if (!formattedValue) return;
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(formattedValue)
+        .then(() => toast.success("Номер скопирован"))
+        .catch(() => {});
+    }
+    const telHref = buildTelHref(value);
+    if (telHref && typeof window !== "undefined") {
+      window.location.href = telHref;
+    }
+  };
+
+  if (!formattedValue) {
+    return <span className={`text-slate-500 dark:text-slate-400 ${className}`}>—</span>;
+  }
+
+  const buttonClasses = [
+    "font-semibold text-slate-900 dark:text-slate-100",
+    "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 transition",
+    showHint ? "group flex flex-col items-start text-left gap-0.5" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <button type="button" onClick={handleClick} className={buttonClasses} title="Скопировать номер или позвонить">
+      <span>{formattedValue}</span>
+      {showHint && (
+        <span className="text-[11px] font-medium text-indigo-600/80 opacity-0 transition group-hover:opacity-100 dark:text-indigo-300/90">
+          Нажмите, чтобы скопировать или позвонить
+        </span>
+      )}
+    </button>
+  );
+}
+
+function IconButton({ onClick, ariaLabel }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full border border-slate-200 p-1.5 text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-300"
+      aria-label={ariaLabel}
+      title={ariaLabel}
+    >
+      <FiEdit2 className="h-4 w-4" />
+    </button>
+  );
+}
+
+function InfoCell({ label, value, isPhone = false }) {
   return (
     <div className="flex flex-col gap-1 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-sm dark:border-slate-700/60 dark:bg-slate-800/70">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="text-slate-900 dark:text-slate-100">{value || "—"}</span>
+      {isPhone ? (
+        <PhoneActionText
+          value={value}
+          className="flex flex-col items-start text-left text-slate-900 dark:text-slate-100"
+          showHint
+        />
+      ) : (
+        <span className="text-slate-900 dark:text-slate-100">{value || "—"}</span>
+      )}
     </div>
   );
 }

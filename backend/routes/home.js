@@ -91,6 +91,13 @@ function mapMeter(row, lastRecord = null) {
   };
 }
 
+function mapMeterSettings(row) {
+  return {
+    id: row?.id ?? null,
+    due_day: row?.due_day !== null && row?.due_day !== undefined ? Number(row.due_day) : null,
+  };
+}
+
 function mapRecord(row) {
   return {
     id: row.id,
@@ -105,6 +112,13 @@ async function ensureCompanyRow() {
   const existing = await pool.query("SELECT * FROM home_company ORDER BY id ASC LIMIT 1");
   if (existing.rows.length > 0) return existing.rows[0];
   const inserted = await pool.query("INSERT INTO home_company (name) VALUES ($1) RETURNING *", [DEFAULT_COMPANY_TITLE]);
+  return inserted.rows[0];
+}
+
+async function ensureMeterSettingsRow() {
+  const existing = await pool.query("SELECT * FROM home_meter_settings ORDER BY id ASC LIMIT 1");
+  if (existing.rows.length > 0) return existing.rows[0];
+  const inserted = await pool.query("INSERT INTO home_meter_settings (due_day) VALUES (NULL) RETURNING *");
   return inserted.rows[0];
 }
 
@@ -357,6 +371,47 @@ router.delete("/cameras/:id", async (req, res) => {
   } catch (err) {
     console.error("DELETE /api/home/cameras/:id", err);
     return respond(res, 500, { success: false, error: "Не удалось удалить камеру" });
+  }
+});
+
+router.get("/meter-settings", async (_req, res) => {
+  try {
+    const settings = await ensureMeterSettingsRow();
+    return respond(res, 200, { success: true, data: { settings: mapMeterSettings(settings) } });
+  } catch (err) {
+    console.error("GET /api/home/meter-settings", err);
+    return respond(res, 500, { success: false, error: "Не удалось загрузить настройки счётчиков" });
+  }
+});
+
+router.put("/meter-settings", async (req, res) => {
+  try {
+    const settings = await ensureMeterSettingsRow();
+    const payload = req.body || {};
+    let dueDay = payload.due_day ?? payload.dueDay ?? payload.day ?? null;
+    if (dueDay === "" || dueDay === null || dueDay === undefined) {
+      dueDay = null;
+    } else {
+      const parsed = Number(dueDay);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 31) {
+        return respond(res, 400, { success: false, error: "Укажите число от 1 до 31" });
+      }
+      dueDay = parsed;
+    }
+    const updated = await pool.query(
+      `
+      UPDATE home_meter_settings
+      SET due_day = $1,
+          updated_at = NOW()
+      WHERE id = $2
+      RETURNING *;
+    `,
+      [dueDay, settings.id]
+    );
+    return respond(res, 200, { success: true, data: { settings: mapMeterSettings(updated.rows[0]) } });
+  } catch (err) {
+    console.error("PUT /api/home/meter-settings", err);
+    return respond(res, 500, { success: false, error: "Не удалось сохранить настройки счётчиков" });
   }
 });
 
