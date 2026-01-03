@@ -53,6 +53,7 @@ import { ensureWorkspaceSchema } from "./db/workspaceSchema.js";
 import { ensureFlipperSchema } from "./db/flipperSchema.js";
 import { ensureWishSchema } from "./db/wishSchema.js";
 import { ensureSharedLinksSchema } from "./db/sharedLinksSchema.js";
+import { ensureVpnSchema } from "./db/vpnSchema.js";
 import { syncVlessStats } from "./services/xray.js";
 import {
   createUtilityPlaceholders,
@@ -604,6 +605,7 @@ if (ACCOUNTING_JOBS_ENABLED) {
     await ensureFlipperSchema();
     await ensureWishSchema();
     await ensureSharedLinksSchema();
+    await ensureVpnSchema();
     console.log(
       "DB ready: users, user_profiles, user_todos, user_posts, content_items, notes, admin_logs, push_subscriptions, permissions, user_permissions, vless_keys, vless_stats, categories, payments, transactions, incomes, accounting_debts, dashboard_preferences, navigation_preferences, plants, pests, diseases, medicines, analytics, promptmaster, car, home, workspace, flipper, wish, shared_links"
     );

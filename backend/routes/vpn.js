@@ -10,6 +10,7 @@ const router = express.Router();
 const OUTLINE_API_URL = process.env.OUTLINE_API_URL || ""; // e.g. https://server:9090/XXXXXXXX
 const OUTLINE_CACHE_TTL_MS = Number(process.env.OUTLINE_CACHE_TTL_MS || 10000);
 const OUTLINE_INSECURE = String(process.env.OUTLINE_API_INSECURE || "false").toLowerCase() === "true";
+const MAX_SAVED_LINK_LENGTH = 4096;
 
 if (!OUTLINE_API_URL) {
   // eslint-disable-next-line no-console
@@ -59,6 +60,46 @@ async function ensureVpnAccess(req, res, next) {
 
 // All VPN routes require auth and explicit permission/flag
 router.use(authRequired, ensureVpnAccess);
+
+router.get("/saved-link", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const rows = await pool.query("SELECT link FROM vpn_saved_links WHERE user_id = $1", [userId]);
+    const link = rows.rows[0]?.link || "";
+    return res.json({ link });
+  } catch (error) {
+    console.error("GET /api/vpn/saved-link", error);
+    return res.status(500).json({ message: "Не удалось загрузить сохранённую ссылку" });
+  }
+});
+
+router.put("/saved-link", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const raw = req.body?.link;
+    if (raw === undefined) {
+      return res.status(400).json({ message: "Поле link обязательно" });
+    }
+    const link = String(raw || "").trim();
+    if (link.length > MAX_SAVED_LINK_LENGTH) {
+      return res.status(400).json({ message: "Ссылка слишком длинная" });
+    }
+    const stored = link.length ? link : null;
+    await pool.query(
+      `
+      INSERT INTO vpn_saved_links (user_id, link)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id)
+      DO UPDATE SET link = EXCLUDED.link, updated_at = NOW()
+    `,
+      [userId, stored]
+    );
+    return res.json({ link: stored || "" });
+  } catch (error) {
+    console.error("PUT /api/vpn/saved-link", error);
+    return res.status(500).json({ message: "Не удалось сохранить ссылку" });
+  }
+});
 
 // List access keys
 router.get("/outline/keys", async (req, res) => {
